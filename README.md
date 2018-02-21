@@ -2,7 +2,6 @@
 本プログラムはTQEC回路のViewerである.  
 TQEC Optimizerから出力された回路情報を用いる.
 
-## Image
 <img width="1043" alt="2018-02-21 15 28 32" src="https://user-images.githubusercontent.com/8393357/36466218-412cbb64-171c-11e8-9a27-4b14a10b85dc.png">
 
 ## Usage
