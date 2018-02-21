@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>TQEC Viewer</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <script src="js/jquery/jquery-3.3.1.min.js"></script>
+    <script src="js/tether/tether.min.js"></script>
+    <script src="js/bootstrap/bootstrap.min.js"></script>
+
+    <script src="js/three/three.min.js"></script>
+    <script src="js/three/TrackballControls.js"></script>
+    <script src="js/three/dat.gui.min.js"></script>
+    <script src="js/three/STLExporter.js"></script>
+    <script src="js/three/FileSaver.min.js"></script>
+    <script src="js/three/THREE.MeshLine.js"></script>
+    <script src="js/three/OrbitControls.js"></script>
+    <script src="js/tqc/tqc.js"></script>
+    <script src="index.js"></script>
+
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+  </head>
+
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <a class="navbar-brand" href="index.html">TQC Viewer</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+        <div class="navbar-nav">
+          <a class="nav-item nav-link" href="#" onclick="exportSTL()">Export STL<span class="sr-only">(current)</span></a>
+        </div>
+      </div>
+    </nav>
+
+    <div id="drop-zone">Drop files here or click.</div>
+    <input type="file" id="file-selector" style="visibility: hidden;" accept=".json" />
+  </body>
+</html>
