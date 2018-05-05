@@ -16,10 +16,30 @@ class Vector3D {
     this.z = z;
   }
 
+  clone() {
+    return new Vector3D(...this.toArray());
+  }
+
   set(x, y, z) {
     this.x = x;
     this.y = y;
     this.z = z;
+  }
+
+  add(n = 1, base) {
+    let vector3d = this.clone();
+    if (base == 'x') vector3d.x += n;
+    if (base == 'y') vector3d.y += n;
+    if (base == 'z') vector3d.z += n;
+    return vector3d;
+  }
+
+  sub(n = 1, base) {
+    let vector3d = this.clone();
+    if (base == 'x') vector3d.x -= n;
+    if (base == 'y') vector3d.y -= n;
+    if (base == 'z') vector3d.z -= n;
+    return vector3d;
   }
 
   changeAxis() {
@@ -50,7 +70,6 @@ class Rectangler {
 
 class Cube extends Rectangler {
   constructor(pos, type, color = 0) {
-    pos.changeAxis();
     super(pos, type);
     this.ghost = false;
     this.opacity = 1.0;
@@ -73,14 +92,14 @@ class Cube extends Rectangler {
 }
 
 class Edge extends Rectangler {
-  constructor(cube1, cube2, color = 0) {
-    const axis = Edge.getAxis_(cube1, cube2);
-    const pos = Edge.getPos_(cube1, cube2);
-    const size = Edge.getSize_(cube1, cube2, axis);
-    super(pos, cube1.type);
+  constructor(vertex_a, vertex_b, type, color = 0) {
+    const axis = Edge.getAxis_(vertex_a, vertex_b);
+    const pos = Edge.getPos_(vertex_a, vertex_b);
+    const size = Edge.getSize_(vertex_a, vertex_b, axis);
+    super(pos, type);
     this.ghost = false;
     this.opacity = 1.0;
-    this.color = (color == 0) ? cube1.color : color
+    this.color = (color == 0) ? colors[type] : color;
     this.axis = axis;
     this.size = size;
   }
@@ -99,24 +118,24 @@ class Edge extends Rectangler {
     scene.add(cube);
   }
 
-  static getAxis_(cube1, cube2) {
-    if (cube1.pos.x != cube2.pos.x) return 'x';
-    if (cube1.pos.y != cube2.pos.y) return 'y';
-    if (cube1.pos.z != cube2.pos.z) return 'z';
+  static getAxis_(vertex_a, vertex_b) {
+    if (vertex_a.x != vertex_b.x) return 'x';
+    if (vertex_a.y != vertex_b.y) return 'y';
+    if (vertex_a.z != vertex_b.z) return 'z';
     console.assert(false, "invalid asis");
   }
 
-  static getPos_(cube1, cube2) {
-    const x =  (cube2.pos.x + cube1.pos.x) / 2;
-    const y =  (cube2.pos.y + cube1.pos.y) / 2;
-    const z =  (cube2.pos.z + cube1.pos.z) / 2;
+  static getPos_(vertex_a, vertex_b) {
+    const x =  (vertex_b.x + vertex_a.x) / 2;
+    const y =  (vertex_b.y + vertex_a.y) / 2;
+    const z =  (vertex_b.z + vertex_a.z) / 2;
     return new Vector3D(x, y, z);
   }
 
-  static getSize_(cube1, cube2, axis) {
-    const scale_x = axis == 'x' ? Math.abs(cube1.pos.x - cube2.pos.x) - 1.0 : scale;
-    const scale_y = axis == 'y' ? Math.abs(cube1.pos.y - cube2.pos.y) - 1.0 : scale;
-    const scale_z = axis == 'z' ? Math.abs(cube1.pos.z - cube2.pos.z) - 1.0 : scale;
+  static getSize_(vertex_a, vertex_b, axis) {
+    const scale_x = axis == 'x' ? Math.abs(vertex_a.x - vertex_b.x) - 1.0 : scale;
+    const scale_y = axis == 'y' ? Math.abs(vertex_a.y - vertex_b.y) - 1.0 : scale;
+    const scale_z = axis == 'z' ? Math.abs(vertex_a.z - vertex_b.z) - 1.0 : scale;
     return new Size(scale_x, scale_y, scale_z);
   }
 }
@@ -130,8 +149,8 @@ class AerialCube extends Cube {
 }
 
 class AerialEdge extends Edge {
-  constructor(cube1, cube2) {
-    super(cube1, cube2);
+  constructor(vertex_a, vertex_b, type) {
+    super(vertex_a, vertex_b, type);
     this.ghost = true;
     this.opacity = 0.5;
   }
@@ -168,9 +187,7 @@ class SingleBitLine  {
 
       const pos1 = new Vector3D(x * space, this.y * space, this.z * space);
       const pos2 = new Vector3D((x + graph_intarval) * space, this.y * space, this.z * space);
-      const qubit1 = new Cube(pos1, this.type);
-      const qubit2 = new Cube(pos2, this.type);
-      const edge = new Edge(qubit1, qubit2);
+      const edge = new Edge(pos1, pos2, this.type);
       this.line.push(edge);
     }
   }
@@ -205,60 +222,38 @@ class BitLine {
 }
 
 class Injector {
-  constructor(cube1, cube2) {
-    this.cube1 = cube1;
-    this.cube2 = cube2;
-    this.color = cube1.color;
-    this.angles = {1: 'none', 2: 'none'};
+  constructor(vertex_a, vertex_b, type) {
+    let vertices = [vertex_a, vertex_b].sort(function(a, b) {
+      if(a.z < b.z) return -1;
+      if(a.z > b.z) return 1;
+      if(a.y < b.y) return -1;
+      if(a.y > b.y) return 1;
+      if(a.x < b.x) return -1;
+      if(a.x > b.x) return 1;
+      return 0;
+    });
+    this.vertices = vertices;
+    this.vertex_a = vertices[0];
+    this.vertex_b = vertices[1];
     // distance between two cubees
-    this.distance = 0.0;
+    this.distance = Math.max(Math.abs(this.vertices[0].x - this.vertices[1].x),
+                            Math.abs(this.vertices[0].y - this.vertices[1].y),
+                            Math.abs(this.vertices[0].z - this.vertices[1].z))
+    this.axis = this.getAxis_();
+    this.type = type;
+    this.color = colors[type];
     this.ghost = false;
-
-    // calc agnle and distance
-    this.calcAngle_();
   }
 
-  calcAngle_() {
-    // diff x
-    if (Math.abs(this.cube1.pos.x - this.cube2.pos.x) > 0) {
-      this.distance = Math.abs(this.cube1.pos.x - this.cube2.pos.x);
-      if (this.cube1.pos.x > this.cube2.pos.x) {
-        this.angles[1] = 'left';
-        this.angles[2] = 'right';
-      }
-      else {
-        this.angles[1] = 'right';
-        this.angles[2] = 'left';
-      }
-    }
-    // diff y
-    else if (Math.abs(this.cube1.pos.y - this.cube2.pos.y) > 0) {
-      this.distance = Math.abs(this.cube1.pos.y - this.cube2.pos.y);
-      if (this.cube1.pos.y > this.cube2.pos.y) {
-        this.angles[1] = 'back';
-        this.angles[2] = 'front';
-      }
-      else {
-        this.angles[1] = 'front';
-        this.angles[2] = 'back';
-      }
-    }
-    // diff z
-    else {
-      this.distance = Math.abs(this.cube1.pos.z - this.cube2.pos.z);
-      if (this.cube1.pos.z > this.cube2.pos.z) {
-        this.angles[1] = 'down';
-        this.angles[2] = 'up';
-      }
-      else {
-        this.angles[1] = 'up';
-        this.angles[2] = 'down';
-      }
-    }
+  getAxis_() {
+    if (this.vertices[0].x != this.vertices[1].x) return 'x';
+    if (this.vertices[0].y != this.vertices[1].y) return 'y';
+    if (this.vertices[0].z != this.vertices[1].z) return 'z';
+    console.assert(false, "invalid asis");
   }
 
   apply(scene) {
-    for(let mesh of this.createBoxes_()) {
+    for(let mesh of this.createBoxMeshes_()) {
       let edge = new THREE.BoxHelper(mesh, colors.edge);
       edge.material.linewidth = line_width;
       edge.visible = showEdges;
@@ -267,41 +262,32 @@ class Injector {
       scene.add(mesh)
     }
 
-    for(let mesh of this.createCones_()) {
+    for(let mesh of this.createConeMeshes_()) {
       scene.add(mesh)
     }
   }
 
-  createCones_() {
-    const cone1 = this.createConeMesh_(this.cube1, 1);
-    const cone2 = this.createConeMesh_(this.cube2, 2);
+  createBoxMeshes_() {
+    const boxGeometry = new THREE.BoxGeometry(scale, scale, scale);
+    const boxMaterial = new THREE.MeshPhongMaterial({color: this.color, opacity: 0.1, transparent: this.ghost});
+    let box1 = new THREE.Mesh(boxGeometry, boxMaterial);
+    let box2 = new THREE.Mesh(boxGeometry, boxMaterial);
+    let pos1 = this.vertices[0].add(1, this.axis);
+    let pos2 = this.vertices[1].sub(1, this.axis);
+
+    box1.position.set(pos1.x, pos1.y, pos1.z);
+    box2.position.set(pos2.x, pos2.y, pos2.z);
+    return [box1, box2];
+  }
+
+  createConeMeshes_() {
+    const cone1 = this.createConeMesh_(false);
+    const cone2 = this.createConeMesh_(true);
 
     return [cone1, cone2];
   }
 
-  createBoxes_() {
-    const cube1 = this.createBoxMesh_(this.cube1, 1);
-    const cube2 = this.createBoxMesh_(this.cube2, 2);
-
-    return [cube1, cube2];
-  }
-
-  createBoxMesh_(cube, id) {
-    const boxGeometry = new THREE.BoxGeometry(scale, scale, scale);
-    const boxMaterial = new THREE.MeshPhongMaterial({color: this.color, opacity: 0.1, transparent: this.ghost});
-    let box = new THREE.Mesh(boxGeometry, boxMaterial);
-
-    const nx = {'right': scale, 'left': -scale, 'front': 0, 'back': 0, 'up': 0, 'down': 0 };
-    const ny = {'right': 0, 'left': 0, 'front': scale, 'back': -scale, 'up': 0, 'down': 0 };
-    const nz = {'right': 0, 'left': 0, 'front': 0, 'back': 0, 'up': scale, 'down': -scale };
-
-    box.position.set(cube.pos.x + nx[this.angles[id]], cube.pos.y 
-                      + ny[this.angles[id]], cube.pos.z + nz[this.angles[id]]);
-
-    return box;
-  }
-
-  createConeMesh_(cube, id) {
+  createConeMesh_(reverse) {
     const height = (this.distance - scale * 2.0 - 1.0) / 2.0;
     const coneGeometry = new THREE.ConeGeometry(scale/ Math.SQRT2, height, 4);
     const meshMat = new THREE.MeshPhongMaterial({color: this.color, opacity: 0.1, transparent: this.ghost});
@@ -309,36 +295,32 @@ class Injector {
     wireFrameMat.wireframeLinewidth = line_width;
     wireFrameMat.visible = showEdges;
     let cone = THREE.SceneUtils.createMultiMaterialObject(coneGeometry, [meshMat, wireFrameMat]);
-    //let cone = new THREE.Mesh(coneGeometry, wireFrameMat);
+
+    let r = reverse ? Math.PI : 0;
+    if(this.axis === 'x')      cone.rotation.set(Math.PI / 4, 0, Math.PI / 2 - r);
+    else if(this.axis === 'y') cone.rotation.set(r + Math.PI, Math.PI / 4, 0);
+    else if(this.axis === 'z') cone.rotation.set(r - Math.PI / 2, Math.PI / 4, 0);
 
     const diff = ((this.distance * 0.5) - (scale * 1.5)) / 2.0 + scale * 1.5;
-    const nx = {'right': diff, 'left': -diff, 'front': 0, 'back': 0, 'up': 0, 'down': 0 };
-    const ny = {'right': 0, 'left': 0, 'front': diff, 'back': -diff, 'up': 0, 'down': 0 };
-    const nz = {'right': 0, 'left': 0, 'front': 0, 'back': 0, 'up': diff, 'down': -diff };
-
-    const rx = {'right': 0.25, 'left': 0.25, 'front': 0, 'back': -1, 'up': 0.5, 'down': -0.5 };
-    const ry = {'right': 0, 'left': 0, 'front': 0.25, 'back': 0.25, 'up': 0.25, 'down': 0.25 };
-    const rz = {'right': -0.5, 'left': 0.5, 'front': 0, 'back': 0, 'up': 0, 'down': 0 };
-
-    cone.position.set(cube.pos.x + nx[this.angles[id]], cube.pos.y + ny[this.angles[id]], 
-                      cube.pos.z + nz[this.angles[id]]);
-    cone.rotation.set(Math.PI * rx[this.angles[id]], Math.PI * ry[this.angles[id]], 
-                      Math.PI * rz[this.angles[id]]);
+    let pos = new Vector3D();
+    if (reverse) pos = this.vertices[0].add(diff, this.axis);
+    else pos = this.vertices[1].sub(diff, this.axis);
+    cone.position.set(pos.x, pos.y, pos.z);
     
     return cone;
   }
 }
 
 class Pin extends Injector {
-  constructor(cube1, cube2, color = colors.pin) {
-    super(cube1, cube2);
+  constructor(vertex_a, vertex_b, type, color = colors.pin) {
+    super(vertex_a, vertex_b, type);
     this.color = color;
   }
 }
 
 class Cap extends Injector {
-  constructor(cube1, cube2) {
-    super(cube1, cube2);
+  constructor(vertex_a, vertex_b, type) {
+    super(vertex_a, vertex_b, type);
     this.ghost = true;
   }
 }
@@ -372,16 +354,12 @@ class Braiding {
     // add bridge
     let upper = new Vector3D(this.col - space, pitch, this.cbitNo * space);
     let lower = new Vector3D(this.col - space, 0, this.cbitNo * space);
-    let qubit1 = new Cube(upper, "primal");
-    let qubit2 = new Cube(lower, "primal");
-    let edge = new Edge(qubit1, qubit2);
+    let edge = new Edge(upper, lower, "primal");
     this.edges.push(edge);
 
     upper = new Vector3D(this.col + space, pitch, this.cbitNo * space);
     lower = new Vector3D(this.col + space, 0, this.cbitNo * space);
-    qubit1 = new Cube(upper, "primal");
-    qubit2 = new Cube(lower, "primal");
-    edge = new Edge(qubit1, qubit2);
+    edge = new Edge(upper, lower, "primal");
     this.edges.push(edge);
 
     // add qubit
@@ -440,14 +418,14 @@ class Braiding {
     // add edge
     let prev_qubit = this.bits[0];
     const last_qubit = this.bits[this.bits.length-1];
-    this.edges.push(new Edge(prev_qubit, last_qubit, this.color));
+    this.edges.push(new Edge(prev_qubit.pos, last_qubit.pos, this.type, this.color));
     let first = true;
     for(let qubit of this.bits) {
       if (first) {
         first = false;
         continue;
       }
-      let edge = new Edge(prev_qubit, qubit, this.color);
+      let edge = new Edge(prev_qubit.pos, qubit.pos, this.type, this.color);
       this.edges.push(edge);
       prev_qubit = qubit;
     }
@@ -492,7 +470,7 @@ class BraidingWithBridge {
     const lower = new Vector3D(this.col, 0, this.cbitNo * space);
     this.push(upper, "primal");
     this.push(lower, "primal");
-    const edge = new Edge(this.bits[0], this.bits[1]);
+    const edge = new Edge(this.bits[0].pos, this.bits[1].pos, "primal");
     this.edges.push(edge);
     this.bits = [];
 
@@ -546,14 +524,14 @@ class BraidingWithBridge {
     // add edge
     let prev_qubit = this.bits[0];
     const last_qubit = this.bits[this.bits.length-1];
-    this.edges.push(new Edge(prev_qubit, last_qubit));
+    this.edges.push(new Edge(prev_qubit.pos, last_qubit.pos, this.type));
     let first = true;
     for(let qubit of this.bits) {
       if (first) {
         first = false;
         continue;
       }
-      let edge = new Edge(prev_qubit, qubit);
+      let edge = new Edge(prev_qubit.pos, qubit.pos, this.type);
       this.edges.push(edge);
       prev_qubit = qubit;
     }
@@ -691,7 +669,7 @@ class CircuitFactory {
       const pos2 = this.correctPos_(block[1], space);
       const cube1 = new Cube(pos1, type);
       const cube2 = new Cube(pos2, type);
-      const edge = new Edge(cube1, cube2);
+      const edge = new Edge(pos1, pos2, type);
       this.circuit.addCube(cube1);
       this.circuit.addCube(cube2);
       this.circuit.addEdge(edge);
@@ -702,10 +680,8 @@ class CircuitFactory {
     for (let injector of injectors) {
       const pos1 = this.correctPos_(injector.vertices[0], space);
       const pos2 = this.correctPos_(injector.vertices[1], space);
-      const cube1 = new Cube(pos1, type);
-      const cube2 = new Cube(pos2, type);
       const color = injector.color ? injector.color : colors.pin;
-      const pin = new Pin(cube1, cube2, color);
+      const pin = new Pin(pos1, pos2, type, color);
       this.circuit.addInjector(pin);
     }
   }
@@ -714,9 +690,7 @@ class CircuitFactory {
     for (let injector of caps) {
       const pos1 = this.correctPos_(injector.vertices[0], space);
       const pos2 = this.correctPos_(injector.vertices[1], space);
-      const cube1 = new Cube(pos1, type);
-      const cube2 = new Cube(pos2, type);
-      const cap = new Cap(cube1, cube2);
+      const cap = new Cap(pos1, pos2, type);
       this.circuit.addInjector(cap);
     }
   }
@@ -742,10 +716,8 @@ class CircuitFactory {
       const pos1 = this.correctPos_(edge.pos1, space);
       const pos2 = this.correctPos_(edge.pos2, space);
       const type = edge.type;
-      const cube1 = new Cube(pos1, type);
-      const cube2 = new Cube(pos2, type);
       const color = edge.color ? edge.color : 0;
-      const e = new Edge(cube1, cube2, color);
+      const e = new Edge(pos1, pos2, type, color);
       this.circuit.addEdge(e);
     }
   }
@@ -770,9 +742,7 @@ class CircuitFactory {
     for(let edge of this.data.aerial_edges) {
       const pos1 = this.correctPos_(edge.pos1, space);
       const pos2 = this.correctPos_(edge.pos2, space);
-      const cube1 = new Cube(pos1, type);
-      const cube2 = new Cube(pos2, type);
-      const e = new AerialEdge(cube1, cube2);
+      const e = new AerialEdge(pos1, pos2, type);
       this.circuit.addAerialEdge(e);
     }
   }
@@ -808,9 +778,7 @@ class CircuitFactory {
       for(let x of line.bridges) {
         const pos1 = new Vector3D(x * space, 0 * space, line.row * space);
         const pos2 = new Vector3D(x * space, 2 * space, line.row * space);
-        const cube1 = new Cube(pos1, type);
-        const cube2 = new Cube(pos2, type);
-        const e = new Edge(cube1, cube2);
+        const e = new Edge(pos1, pos2, type);
         this.circuit.addEdge(e);
       }
 
@@ -850,15 +818,13 @@ class CircuitFactory {
       const pos1 = this.correctPos_(injector.pos1, space);
       const pos2 = this.correctPos_(injector.pos2, space);
       const type = injector.type;
-      const cube1 = new Cube(pos1, type);
-      const cube2 = new Cube(pos2, type);
 
       if (injector.category == "pin") {
-        const pin = new Pin(cube1, cube2);
+        const pin = new Pin(pos1, pos2, type);
         this.circuit.addInjector(pin);
       }
       else {
-        const cap = new Cap(cube1, cube2);
+        const cap = new Cap(pos1, pos2, type);
         this.circuit.addInjector(cap);
       }
     }
@@ -901,6 +867,7 @@ class CircuitFactory {
     corrected_pos.x = pos[0] * space;
     corrected_pos.y = pos[1] * space;
     corrected_pos.z = pos[2] * space;
+    corrected_pos.changeAxis(); // 軸変更
     return corrected_pos;
   }
 }
