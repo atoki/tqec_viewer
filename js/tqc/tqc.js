@@ -62,60 +62,43 @@ class Size extends Vector3D {
 }
 
 class Rectangler {
-  constructor(pos, type) {
+  constructor(pos, size, type, color = 0, opacity = 1.0, ghost = false) {
     this.pos = pos;
+    this.size = size;
     this.type = type;
+    this.color = (color == 0) ? colors[type] : color;
+    this.opacity = opacity;
+    this.ghost = ghost;
+  }
+
+  apply(scene) {
+    const boxGeometry = new THREE.BoxGeometry(this.size.x, this.size.y, this.size.z);
+    const boxMaterial = new THREE.MeshPhongMaterial({color: this.color, opacity: this.opacity, transparent: this.ghost});
+    let box = new THREE.Mesh(boxGeometry, boxMaterial);
+    box.position.set(this.pos.x, this.pos.y, this.pos.z);
+
+    let edge = new THREE.BoxHelper(box, colors.edge);
+    edge.material.linewidth = line_width;
+    edge.visible = showEdges;
+
+    scene.add(box);
+    scene.add(edge);
   }
 }
 
 class Cube extends Rectangler {
-  constructor(pos, type, color = 0) {
-    super(pos, type);
-    this.ghost = false;
-    this.opacity = 1.0;
-    this.color = (color == 0) ? colors[type] : color;
-  }
-
-  apply(scene) {
-    const cubeGeometry = new THREE.BoxGeometry(scale, scale, scale);
-    const cubeMaterial = new THREE.MeshPhongMaterial({color: this.color, opacity: this.opacity, transparent: this.ghost});
-    let cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-    cube.position.set(this.pos.x, this.pos.y, this.pos.z);
-
-    let edge = new THREE.BoxHelper(cube, colors.edge);
-    edge.material.linewidth = line_width;
-    edge.visible = showEdges;
-
-    scene.add(edge);
-    scene.add(cube);
+  constructor(pos, type, color = 0, opacity = 1.0, ghost = false) {
+    super(pos, new Size(scale, scale, scale), type, color, opacity, ghost);
   }
 }
 
 class Edge extends Rectangler {
-  constructor(vertex_a, vertex_b, type, color = 0) {
+  constructor(vertex_a, vertex_b, type, color = 0, opacity = 1.0, ghost = false) {
     const axis = Edge.getAxis_(vertex_a, vertex_b);
     const pos = Edge.getPos_(vertex_a, vertex_b);
     const size = Edge.getSize_(vertex_a, vertex_b, axis);
-    super(pos, type);
-    this.ghost = false;
-    this.opacity = 1.0;
-    this.color = (color == 0) ? colors[type] : color;
+    super(pos, size, type, color, opacity, ghost);
     this.axis = axis;
-    this.size = size;
-  }
-
-  apply(scene) {
-    const cubeGeometry = new THREE.BoxGeometry(this.size.x, this.size.y, this.size.z);
-    const cubeMaterial = new THREE.MeshPhongMaterial({color: this.color, opacity: this.opacity, transparent: this.ghost});
-    let cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-    cube.position.set(this.pos.x, this.pos.y, this.pos.z);
-
-    let edge = new THREE.BoxHelper(cube, colors.edge);
-    edge.material.linewidth = line_width;
-    edge.visible = showEdges;
-
-    scene.add(edge);
-    scene.add(cube);
   }
 
   static getAxis_(vertex_a, vertex_b) {
@@ -142,17 +125,44 @@ class Edge extends Rectangler {
 
 class AerialCube extends Cube {
   constructor(pos, type) {
-    super(pos, type);
-    this.ghost = true;
-    this.opacity = 0.5;
+    super(pos, type, 0, true, 0.5);
   }
 }
 
 class AerialEdge extends Edge {
   constructor(vertex_a, vertex_b, type) {
-    super(vertex_a, vertex_b, type);
-    this.ghost = true;
-    this.opacity = 0.5;
+    super(vertex_a, vertex_b, type, 0, true, 0.5);
+  }
+}
+
+class SquarePyramid {
+  constructor(pos, height, axis, reverse, type, color = 0, opacity = 1.0, ghost = false) {
+    this.pos = pos;
+    this.height = height;
+    this.axis = axis;
+    this.size = new Size(scale / Math.SQRT2, height, 4);
+    this.reverse = reverse;
+    this.type = type;
+    this.color = (color == 0) ? colors[type] : color;
+    this.opacity = opacity;
+    this.ghost = ghost;
+  }
+
+  apply(scene) {
+    const coneGeometry = new THREE.ConeGeometry(this.size.x, this.size.y, this.size.z);
+    const meshMat = new THREE.MeshPhongMaterial({color: this.color, opacity: this.opacity, transparent: this.ghost});
+    let wireFrameMat = new THREE.MeshPhongMaterial({color: colors.edge, wireframe: true});
+    wireFrameMat.wireframeLinewidth = line_width;
+    wireFrameMat.visible = showEdges;
+    let cone = THREE.SceneUtils.createMultiMaterialObject(coneGeometry, [meshMat, wireFrameMat]);
+    cone.position.set(this.pos.x, this.pos.y, this.pos.z);
+
+    const r = this.reverse ? Math.PI : 0;
+    if(this.axis === 'x')      cone.rotation.set(Math.PI / 4, 0, Math.PI / 2 - r);
+    else if(this.axis === 'y') cone.rotation.set(r + Math.PI, Math.PI / 4, 0);
+    else if(this.axis === 'z') cone.rotation.set(r - Math.PI / 2, Math.PI / 4, 0);
+    
+    scene.add(cone);
   }
 }
 
@@ -222,7 +232,7 @@ class BitLine {
 }
 
 class Injector {
-  constructor(vertex_a, vertex_b, type) {
+  constructor(vertex_a, vertex_b, type, color = 0, opacity = 0.1, ghost = false) {
     let vertices = [vertex_a, vertex_b].sort(function(a, b) {
       if(a.z < b.z) return -1;
       if(a.z > b.z) return 1;
@@ -233,16 +243,15 @@ class Injector {
       return 0;
     });
     this.vertices = vertices;
-    this.vertex_a = vertices[0];
-    this.vertex_b = vertices[1];
     // distance between two cubees
     this.distance = Math.max(Math.abs(this.vertices[0].x - this.vertices[1].x),
                             Math.abs(this.vertices[0].y - this.vertices[1].y),
                             Math.abs(this.vertices[0].z - this.vertices[1].z))
     this.axis = this.getAxis_();
     this.type = type;
-    this.color = colors[type];
-    this.ghost = false;
+    this.color = color;
+    this.opacity = opacity;
+    this.ghost = ghost;
   }
 
   getAxis_() {
@@ -253,75 +262,46 @@ class Injector {
   }
 
   apply(scene) {
-    for(let mesh of this.createBoxMeshes_()) {
-      let edge = new THREE.BoxHelper(mesh, colors.edge);
-      edge.material.linewidth = line_width;
-      edge.visible = showEdges;
-
-      scene.add(edge);
-      scene.add(mesh)
+    for(let cube of this.createCubes_()) {
+      cube.apply(scene);
     }
 
-    for(let mesh of this.createConeMeshes_()) {
-      scene.add(mesh)
+    for(let cone of this.createCones_()) {
+      cone.apply(scene)
     }
   }
 
-  createBoxMeshes_() {
-    const boxGeometry = new THREE.BoxGeometry(scale, scale, scale);
-    const boxMaterial = new THREE.MeshPhongMaterial({color: this.color, opacity: 0.1, transparent: this.ghost});
-    let box1 = new THREE.Mesh(boxGeometry, boxMaterial);
-    let box2 = new THREE.Mesh(boxGeometry, boxMaterial);
-    let pos1 = this.vertices[0].add(1, this.axis);
-    let pos2 = this.vertices[1].sub(1, this.axis);
+  createCubes_() {
+    const pos1 = this.vertices[0].add(1, this.axis);
+    const pos2 = this.vertices[1].sub(1, this.axis);
+    const cube1 = new Cube(pos1, this.type, this.color, this.opacity, this.true);
+    const cube2 = new Cube(pos2, this.type, this.color, this.opacity, this.ghost);
 
-    box1.position.set(pos1.x, pos1.y, pos1.z);
-    box2.position.set(pos2.x, pos2.y, pos2.z);
-    return [box1, box2];
+    return [cube1, cube2];
   }
 
-  createConeMeshes_() {
-    const cone1 = this.createConeMesh_(false);
-    const cone2 = this.createConeMesh_(true);
+  createCones_() {
+    const height = (this.distance - scale * 2.0 - 1.0) / 2.0;
+    const diff = ((this.distance * 0.5) - (scale * 1.5)) / 2.0 + scale * 1.5;
+    let pos1 = this.vertices[1].sub(diff, this.axis);
+    let pos2 = this.vertices[0].add(diff, this.axis);
+
+    const cone1 = new SquarePyramid(pos1, height, this.axis, false, this.type, this.color, this.opacity, this.ghost);
+    const cone2 = new SquarePyramid(pos2, height, this.axis, true, this.type, this.color, this.opacity, this.ghost);
 
     return [cone1, cone2];
-  }
-
-  createConeMesh_(reverse) {
-    const height = (this.distance - scale * 2.0 - 1.0) / 2.0;
-    const coneGeometry = new THREE.ConeGeometry(scale/ Math.SQRT2, height, 4);
-    const meshMat = new THREE.MeshPhongMaterial({color: this.color, opacity: 0.1, transparent: this.ghost});
-    let wireFrameMat = new THREE.MeshPhongMaterial({color: colors.edge, wireframe: true});
-    wireFrameMat.wireframeLinewidth = line_width;
-    wireFrameMat.visible = showEdges;
-    let cone = THREE.SceneUtils.createMultiMaterialObject(coneGeometry, [meshMat, wireFrameMat]);
-
-    let r = reverse ? Math.PI : 0;
-    if(this.axis === 'x')      cone.rotation.set(Math.PI / 4, 0, Math.PI / 2 - r);
-    else if(this.axis === 'y') cone.rotation.set(r + Math.PI, Math.PI / 4, 0);
-    else if(this.axis === 'z') cone.rotation.set(r - Math.PI / 2, Math.PI / 4, 0);
-
-    const diff = ((this.distance * 0.5) - (scale * 1.5)) / 2.0 + scale * 1.5;
-    let pos = new Vector3D();
-    if (reverse) pos = this.vertices[0].add(diff, this.axis);
-    else pos = this.vertices[1].sub(diff, this.axis);
-    cone.position.set(pos.x, pos.y, pos.z);
-    
-    return cone;
   }
 }
 
 class Pin extends Injector {
   constructor(vertex_a, vertex_b, type, color = colors.pin) {
-    super(vertex_a, vertex_b, type);
-    this.color = color;
+    super(vertex_a, vertex_b, type, color);
   }
 }
 
 class Cap extends Injector {
   constructor(vertex_a, vertex_b, type) {
-    super(vertex_a, vertex_b, type);
-    this.ghost = true;
+    super(vertex_a, vertex_b, type, colors[type], 0.1, true);
   }
 }
 
