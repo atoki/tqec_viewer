@@ -87,17 +87,17 @@ class Rectangler {
 }
 
 class Cube extends Rectangler {
-  constructor(pos, type, color = 0, opacity = 1.0, ghost = false) {
-    super(pos, new Size(scale, scale, scale), type, color, opacity, ghost);
+  constructor(pos, type, ...visual) {
+    super(pos, new Size(scale, scale, scale), type, ...visual);
   }
 }
 
 class Edge extends Rectangler {
-  constructor(vertex_a, vertex_b, type, color = 0, opacity = 1.0, ghost = false) {
+  constructor(vertex_a, vertex_b, type, ...visual) {
     const axis = Edge.getAxis_(vertex_a, vertex_b);
     const pos = Edge.getPos_(vertex_a, vertex_b);
     const size = Edge.getSize_(vertex_a, vertex_b, axis);
-    super(pos, size, type, color, opacity, ghost);
+    super(pos, size, type, ...visual);
     this.axis = axis;
   }
 
@@ -261,6 +261,10 @@ class Injector {
     console.assert(false, "invalid asis");
   }
 
+  getVisual() {
+    return [this.color, this.opacity, this.ghost];
+  }
+
   apply(scene) {
     for(let cube of this.createCubes_()) {
       cube.apply(scene);
@@ -274,8 +278,8 @@ class Injector {
   createCubes_() {
     const pos1 = this.vertices[0].add(1, this.axis);
     const pos2 = this.vertices[1].sub(1, this.axis);
-    const cube1 = new Cube(pos1, this.type, this.color, this.opacity, this.true);
-    const cube2 = new Cube(pos2, this.type, this.color, this.opacity, this.ghost);
+    const cube1 = new Cube(pos1, this.type, ...this.getVisual());
+    const cube2 = new Cube(pos2, this.type, ...this.getVisual());
 
     return [cube1, cube2];
   }
@@ -286,8 +290,8 @@ class Injector {
     let pos1 = this.vertices[1].sub(diff, this.axis);
     let pos2 = this.vertices[0].add(diff, this.axis);
 
-    const cone1 = new SquarePyramid(pos1, height, this.axis, false, this.type, this.color, this.opacity, this.ghost);
-    const cone2 = new SquarePyramid(pos2, height, this.axis, true, this.type, this.color, this.opacity, this.ghost);
+    const cone1 = new SquarePyramid(pos1, height, this.axis, false, this.type, ...this.getVisual());
+    const cone2 = new SquarePyramid(pos2, height, this.axis, true, this.type, ...this.getVisual());
 
     return [cone1, cone2];
   }
@@ -644,12 +648,18 @@ class CircuitFactory {
   }
 
   createBlocks_(type, blocks = []) {
+    let vertices = [];
+    let visual = [];
     for (let block of blocks) {
-      const pos1 = this.correctPos_(block[0], space);
-      const pos2 = this.correctPos_(block[1], space);
-      const cube1 = new Cube(pos1, type);
-      const cube2 = new Cube(pos2, type);
-      const edge = new Edge(pos1, pos2, type);
+      if (Array.isArray(block)) vertices.push(block);
+      if ("visual" in block) visual = this.parseVisual_(block.visual);
+    }
+    for (let vertex of vertices) {
+      const pos1 = this.correctPos_(vertex[0], space);
+      const pos2 = this.correctPos_(vertex[1], space);
+      const cube1 = new Cube(pos1, type, ...visual);
+      const cube2 = new Cube(pos2, type, ...visual);
+      const edge = new Edge(pos1, pos2, type, ...visual);
       this.circuit.addCube(cube1);
       this.circuit.addCube(cube2);
       this.circuit.addEdge(edge);
@@ -660,8 +670,8 @@ class CircuitFactory {
     for (let injector of injectors) {
       const pos1 = this.correctPos_(injector.vertices[0], space);
       const pos2 = this.correctPos_(injector.vertices[1], space);
-      const color = injector.color ? injector.color : colors.pin;
-      const pin = new Pin(pos1, pos2, type, color);
+      const visual = injector.visual ? this.parseVisual_(injector.visual) : [];
+      const pin = new Pin(pos1, pos2, type, ...visual);
       this.circuit.addInjector(pin);
     }
   }
@@ -670,7 +680,8 @@ class CircuitFactory {
     for (let injector of caps) {
       const pos1 = this.correctPos_(injector.vertices[0], space);
       const pos2 = this.correctPos_(injector.vertices[1], space);
-      const cap = new Cap(pos1, pos2, type);
+      const visual = injector.visual ? this.parseVisual_(injector.visual) : [];
+      const cap = new Cap(pos1, pos2, type, ...visual);
       this.circuit.addInjector(cap);
     }
   }
@@ -682,8 +693,8 @@ class CircuitFactory {
     for(let cube of this.data.cubes) {
       const pos = this.correctPos_(cube.pos, space);
       const type = cube.type;
-      const color = cube.color ? cube.color : 0;
-      const c = new Cube(pos, type, color);
+      const visual = cube.visual ? this.parseVisual_(cube.visual) : [];
+      const c = new Cube(pos, type, ...visual);
       this.circuit.addCube(c);
     }
   }
@@ -696,8 +707,8 @@ class CircuitFactory {
       const pos1 = this.correctPos_(edge.pos1, space);
       const pos2 = this.correctPos_(edge.pos2, space);
       const type = edge.type;
-      const color = edge.color ? edge.color : 0;
-      const e = new Edge(pos1, pos2, type, color);
+      const visual = edge.visual ? this.parseVisual_(edge.visual) : [];
+      const e = new Edge(pos1, pos2, type, ...visual);
       this.circuit.addEdge(e);
     }
   }
@@ -798,13 +809,14 @@ class CircuitFactory {
       const pos1 = this.correctPos_(injector.pos1, space);
       const pos2 = this.correctPos_(injector.pos2, space);
       const type = injector.type;
+      const visual = injector.visual ? this.parseVisual_(injector.visual) : [];
 
       if (injector.category == "pin") {
-        const pin = new Pin(pos1, pos2, type);
+        const pin = new Pin(pos1, pos2, type, ...visual);
         this.circuit.addInjector(pin);
       }
       else {
-        const cap = new Cap(pos1, pos2, type);
+        const cap = new Cap(pos1, pos2, type, ...visual);
         this.circuit.addInjector(cap);
       }
     }
@@ -849,5 +861,13 @@ class CircuitFactory {
     corrected_pos.z = pos[2] * space;
     corrected_pos.changeAxis(); // 軸変更
     return corrected_pos;
+  }
+
+  parseVisual_(data) {
+    let visual = [];
+    if ("color" in data) visual.push(data["color"]);
+    if ("opacity" in data) visual.push(data["opacity"]);
+    if ("ghost" in data) visual.push(data["ghost"]);
+    return visual;
   }
 }
