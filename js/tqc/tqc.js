@@ -44,6 +44,7 @@ class Vector3D {
 
   changeAxis() {
     this.x = [this.z, this.z = this.x][0];
+    return this;
   }
 
   toArray() {
@@ -167,8 +168,8 @@ class SquarePyramid {
 }
 
 class SingleBitLine  {
-  constructor(z, range, y, cbits) {
-    this.z = z;
+  constructor(x, range, y, cbits) {
+    this.x = x;
     this.range = range;
     this.y = y;
     this.cbits = cbits;
@@ -178,28 +179,37 @@ class SingleBitLine  {
   }
 
   createBits_() {
-    for(let x = this.range[0]; x <= this.range[1]; x += graph_intarval) {
-      const pos = new Vector3D(x * space, this.y * space, this.z * space);
+    for(let z = this.range[0]; z <= this.range[1]; z += graph_intarval) {
+      const pos = this.correctPos_([this.x, this.y, z], space);
       const qubit = new Cube(pos, this.type);
       this.line.push(qubit);
     }
   }
 
   createEdges_() {
-    for(let x = this.range[0]; x <= this.range[1] - graph_intarval; x += graph_intarval) {
+    for(let z = this.range[0]; z <= this.range[1] - graph_intarval; z += graph_intarval) {
       let skip = false;
       for (let cbit of this.cbits) {
-        if (this.z == cbit.control && x + 1 == cbit.column) {
+        if (this.x == cbit.control && z + 1 == cbit.column) {
           skip = true;
         }
       }
       if (skip) continue;
 
-      const pos1 = new Vector3D(x * space, this.y * space, this.z * space);
-      const pos2 = new Vector3D((x + graph_intarval) * space, this.y * space, this.z * space);
+      const pos1 = this.correctPos_([this.x, this.y, z], space);
+      const pos2 = this.correctPos_([this.x, this.y, z + graph_intarval], space);
       const edge = new Edge(pos1, pos2, this.type);
       this.line.push(edge);
     }
+  }
+
+  correctPos_(pos, space) {
+    const corrected_pos = new Vector3D();
+    corrected_pos.x = pos[0] * space;
+    corrected_pos.y = pos[1] * space;
+    corrected_pos.z = pos[2] * space;
+    corrected_pos.changeAxis(); // 軸変更
+    return corrected_pos;
   }
 
   create() {
@@ -210,14 +220,14 @@ class SingleBitLine  {
 }
 
 class BitLine {
-  constructor(z, range, cbits) {
-    this.z = z;
+  constructor(x, range, cbits) {
+    this.x = x;
     this.range = range;
     this.cbits = cbits;
     this.lines = [];
 
-    const upper_line = new SingleBitLine(z, range, graph_intarval, this.cbits);
-    const lower_line = new SingleBitLine(z, range, 0, this.cbits);
+    const upper_line = new SingleBitLine(x, range, graph_intarval, this.cbits);
+    const lower_line = new SingleBitLine(x, range, 0, this.cbits);
     this.lines.push(upper_line.create());
     this.lines.push(lower_line.create());
   }
@@ -766,9 +776,9 @@ class CircuitFactory {
       if (!line.bridges) {
         line.bridges = [];
       }
-      for(let x of line.bridges) {
-        const pos1 = new Vector3D(x * space, 0 * space, line.row * space);
-        const pos2 = new Vector3D(x * space, 2 * space, line.row * space);
+      for(let z of line.bridges) {
+        const pos1 = new Vector3D(line.row * space, 0 * space, z * space).changeAxis();
+        const pos2 = new Vector3D(line.row * space, 2 * space, z * space).changeAxis();
         const e = new Edge(pos1, pos2, type);
         this.circuit.addEdge(e);
       }
@@ -777,12 +787,10 @@ class CircuitFactory {
       if (!line.pins) {
         line.pins = [];
       }
-      for(let x of line.pins) {
-        const pos1 = new Vector3D(x * space, 0 * space, line.row * space);
-        const pos2 = new Vector3D(x * space, 2 * space, line.row * space);
-        const cube1 = new Cube(pos1, type);
-        const cube2 = new Cube(pos2, type);
-        const pin = new Pin(cube1, cube2);
+      for(let z of line.pins) {
+        const pos1 = new Vector3D(line.row  * space, 0 * space, z * space).changeAxis();
+        const pos2 = new Vector3D(line.row  * space, 2 * space, z * space).changeAxis();
+        const pin = new Pin(pos1, pos2, type);
         this.circuit.addInjector(pin);
       }
 
@@ -790,12 +798,10 @@ class CircuitFactory {
       if (!line.caps) {
         line.caps = [];
       }
-      for(let x of line.caps) {
-        const pos1 = new Vector3D(x * space, 0 * space, line.row * space);
-        const pos2 = new Vector3D(x * space, 2 * space, line.row * space);
-        const cube1 = new Cube(pos1, type);
-        const cube2 = new Cube(pos2, type);
-        const cap = new Cap(cube1, cube2);
+      for(let z of line.caps) {
+        const pos1 = new Vector3D(line.row  * space, 0 * space, z * space).changeAxis();
+        const pos2 = new Vector3D(line.row  * space, 2 * space, z * space).changeAxis();
+        const cap = new Cap(pos1, pos2, type);
         this.circuit.addInjector(cap);
       }
     }
