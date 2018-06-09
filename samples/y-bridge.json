@@ -1,0 +1,75 @@
+{
+    "bit_lines": [
+        {
+            "row": 0,
+            "range": [0, 22],
+            "caps": [22]
+        },
+        {
+            "row": 2,
+            "range": [0, 22],
+            "pins": [20]
+        },
+        {
+            "row": 4,
+            "range": [0, 22],
+            "pins": [20]
+        },
+        {
+            "row": 6,
+            "range": [0, 22],
+            "pins": [20],
+            "bridges": [0]
+        },
+        {
+            "row": 8,
+            "range": [0, 22],
+            "pins": [20]
+        },
+        {
+            "row": 10,
+            "range": [0, 22],
+            "pins": [20],
+            "bridges": [0]
+        },
+        {
+            "row": 12,
+            "range": [0, 22],
+            "pins": [20],
+            "bridges": [0]
+        },
+        {
+            "row": 14,
+            "range": [0, 22],
+            "pins": [20],
+            "bridges": [0]
+        }
+    ],
+    "braidings": [
+        {
+            "control": 0,
+            "targets": [8],
+            "column": 2
+        },
+        {
+            "control": 6,
+            "targets": [10, 12],
+            "column": 6
+        },
+        {
+            "control": 8,
+            "targets": [10, 12, 14],
+            "column": 10
+        },
+        {
+            "control": 4,
+            "targets": [6, 12, 14],
+            "column": 14
+        },
+        {
+            "control": 2,
+            "targets": [6, 10, 14],
+            "column": 18
+        }
+    ]
+}
