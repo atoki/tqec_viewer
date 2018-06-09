@@ -1,6 +1,9 @@
 'use strict'
 
-var colors = {primal: 0xed1010, dual: 0x180cf7, module: 0xffefd5, pin: 0xffffe0, edge: 0x000000, aerial: 0x008b8b};
+var colors = {primal: 0xed1010, dual: 0x180cf7, module: 0xffefd5, 
+               pin: 0xffffe0, edge: 0x000000, aerial: 0x008b8b};
+// var colors = {primal: 0xffffff, dual: 0x333333, module: 0xffefd5, 
+//               pin: 0x800080, edge: 0x000000, aerial: 0x008b8b};
 var scale = 1;
 var margin = 4;         // >= 4
 var pitch = margin + 1;
@@ -664,15 +667,23 @@ class CircuitFactory {
       if (Array.isArray(block)) vertices.push(block);
       if ("visual" in block) visual = this.parseVisual_(block.visual);
     }
-    for (let vertex of vertices) {
-      const pos1 = this.correctPos_(vertex[0], space);
-      const pos2 = this.correctPos_(vertex[1], space);
-      const cube1 = new Cube(pos1, type, ...visual);
-      const cube2 = new Cube(pos2, type, ...visual);
-      const edge = new Edge(pos1, pos2, type, ...visual);
-      this.circuit.addCube(cube1);
-      this.circuit.addCube(cube2);
-      this.circuit.addEdge(edge);
+    for (let vertex_list of vertices) {
+      let first = false;
+      let last_pos = vertex_list[0];
+      let last_cube = new Cube(last_pos, type, ...visual);
+      this.circuit.addCube(last_cube);
+      for (let vertex of vertex_list) {
+        if (first) {
+          first = false;
+          continue;
+        }
+        const pos = this.correctPos_(vertex, space);
+        const cube = new Cube(pos, type, ...visual);
+        const edge = new Edge(last_pos, pos, type, ...visual);
+        this.circuit.addCube(cube);
+        this.circuit.addEdge(edge);
+        last_pos = pos;
+      }
     }
   }
 
