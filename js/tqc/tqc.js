@@ -3,7 +3,7 @@
 var colors = {primal: 0xed1010, dual: 0x180cf7, module: 0xffefd5, 
                pin: 0xffffe0, edge: 0x000000, aerial: 0x008b8b};
 // var colors = {primal: 0xffffff, dual: 0x333333, module: 0xffefd5, 
-//               pin: 0x800080, edge: 0x000000, aerial: 0x008b8b};
+//               pin: 0xff55ff, edge: 0x000000, aerial: 0x008b8b};
 var scale = 1;
 var margin = 4;         // >= 4
 var pitch = margin + 1;
@@ -223,14 +223,15 @@ class SingleBitLine  {
 }
 
 class BitLine {
-  constructor(x, range, cbits) {
+  constructor(x, range, height, cbits) {
     this.x = x;
     this.range = range;
     this.cbits = cbits;
+    this.height = height
     this.lines = [];
 
-    const upper_line = new SingleBitLine(x, range, graph_intarval, this.cbits);
-    const lower_line = new SingleBitLine(x, range, 0, this.cbits);
+    const upper_line = new SingleBitLine(x, range, height + graph_intarval / 2, this.cbits);
+    const lower_line = new SingleBitLine(x, range, height - graph_intarval / 2, this.cbits);
     this.lines.push(upper_line.create());
     this.lines.push(lower_line.create());
   }
@@ -780,7 +781,7 @@ class CircuitFactory {
         }  
       }
       
-      const l = new BitLine(line.row, line.range, cbits);
+      const l = new BitLine(line.row, line.range, line.height, cbits);
       this.circuit.addBitLine(l);
 
       // bridges
@@ -788,8 +789,12 @@ class CircuitFactory {
         line.bridges = [];
       }
       for(let z of line.bridges) {
-        const pos1 = new Vector3D(line.row * space, 0 * space, z * space).changeAxis();
-        const pos2 = new Vector3D(line.row * space, 2 * space, z * space).changeAxis();
+        const pos1 = new Vector3D(line.row * space, 
+                                  (line.height - graph_intarval / 2) * space, 
+                                  z * space).changeAxis();
+        const pos2 = new Vector3D(line.row * space, 
+                                  (line.height + graph_intarval / 2) * space, 
+                                  z * space).changeAxis();
         const e = new Edge(pos1, pos2, type);
         this.circuit.addEdge(e);
       }
@@ -799,8 +804,12 @@ class CircuitFactory {
         line.pins = [];
       }
       for(let z of line.pins) {
-        const pos1 = new Vector3D(line.row  * space, 0 * space, z * space).changeAxis();
-        const pos2 = new Vector3D(line.row  * space, 2 * space, z * space).changeAxis();
+        const pos1 = new Vector3D(line.row  * space, 
+                                  (line.height - graph_intarval / 2) * space, 
+                                  z * space).changeAxis();
+        const pos2 = new Vector3D(line.row  * space, 
+                                  (line.height + graph_intarval / 2) * space, 
+                                  z * space).changeAxis();
         const pin = new Pin(pos1, pos2, type);
         this.circuit.addInjector(pin);
       }
@@ -810,8 +819,12 @@ class CircuitFactory {
         line.caps = [];
       }
       for(let z of line.caps) {
-        const pos1 = new Vector3D(line.row  * space, 0 * space, z * space).changeAxis();
-        const pos2 = new Vector3D(line.row  * space, 2 * space, z * space).changeAxis();
+        const pos1 = new Vector3D(line.row  * space, 
+                                  (line.height - graph_intarval / 2) * space, 
+                                  z * space).changeAxis();
+        const pos2 = new Vector3D(line.row  * space, 
+                                  (line.height + graph_intarval / 2) * space, 
+                                  z * space).changeAxis();
         const cap = new Cap(pos1, pos2, type);
         this.circuit.addInjector(cap);
       }
