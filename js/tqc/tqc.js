@@ -342,7 +342,7 @@ class Braiding {
     const d = (this.cbitNo < this.tbitNoArray[0]) ? 1.0 : -1.0;
 
     this.push = function(pos, type = this.type) {
-      this.bits.push(new Cube(pos, type, this.color));
+      this.bits.push(new Cube(pos.clone(), type, this.color));
     }
 
     // add bridge
@@ -358,8 +358,8 @@ class Braiding {
 
     // add qubit
     let pos = new Vector3D(this.col - space * d * 2, 
-                      this.height, 
-                      this.cbitNo * space  - space * d);
+                           this.height, 
+                           this.cbitNo * space  - space * d);
     this.push(pos);
     pos.z += pitch * d;
     this.push(pos);
@@ -456,7 +456,7 @@ class BraidingWithBridge {
     const d = (this.cbitNo < this.tbitNoArray[0]) ? 1.0 : -1.0;
 
     this.push = function(pos, type = this.type) {
-      this.bits.push(new Cube(pos, type));
+      this.bits.push(new Cube(pos.clone(), type));
     }
 
     // add bridge
