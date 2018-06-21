@@ -102,6 +102,8 @@ class Edge extends Rectangler {
     const pos = Edge.getPos_(vertex_a, vertex_b);
     const size = Edge.getSize_(vertex_a, vertex_b, axis);
     super(pos, size, type, ...visual);
+    this.vertex_a = vertex_a;
+    this.vertex_b = vertex_b;
     this.axis = axis;
   }
 
@@ -120,22 +122,55 @@ class Edge extends Rectangler {
   }
 
   static getSize_(vertex_a, vertex_b, axis) {
-    const scale_x = axis == 'x' ? Math.abs(vertex_a.x - vertex_b.x) - 1.0 : scale;
-    const scale_y = axis == 'y' ? Math.abs(vertex_a.y - vertex_b.y) - 1.0 : scale;
-    const scale_z = axis == 'z' ? Math.abs(vertex_a.z - vertex_b.z) - 1.0 : scale;
+    const scale_x = axis == 'x' ? Math.abs(vertex_a.x - vertex_b.x) + scale : scale;
+    const scale_y = axis == 'y' ? Math.abs(vertex_a.y - vertex_b.y) + scale : scale;
+    const scale_z = axis == 'z' ? Math.abs(vertex_a.z - vertex_b.z) + scale : scale;
     return new Size(scale_x, scale_y, scale_z);
+  }
+
+  createEdge() {
+    const boxGeometry = new THREE.BoxGeometry(this.size.x, this.size.y, this.size.z);
+    const boxMaterial = new THREE.MeshPhongMaterial({color: this.color, opacity: this.opacity, transparent: this.ghost});
+    let box = new THREE.Mesh(boxGeometry, boxMaterial);
+    box.position.set(this.pos.x, this.pos.y, this.pos.z);
+    let edge = new THREE.BoxHelper(box, colors.edge);
+    edge.material.linewidth = line_width;
+    edge.visible = showEdges;
+
+    return [box, edge];
+  }
+
+  createCubeLine(vertex) {
+    const cubeGeometry = new THREE.BoxGeometry(scale, scale, scale);
+    const cubeMaterial = new THREE.MeshPhongMaterial();
+    let cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+    cube.position.set(vertex.x, vertex.y, vertex.z);
+    let cube_line = new THREE.BoxHelper(cube, colors.edge);
+
+    return cube_line;
+  }
+
+  apply(scene) {
+    let [box, edge] = this.createEdge();
+    let cube_line1 = this.createCubeLine(this.vertex_a);
+    let cube_line2 = this.createCubeLine(this.vertex_b);
+
+    scene.add(box);
+    scene.add(edge);
+    scene.add(cube_line1);
+    scene.add(cube_line2);
   }
 }
 
 class AerialCube extends Cube {
   constructor(pos, type) {
-    super(pos, type, 0, true, 0.5);
+    super(pos, type, 0, 0.5, true);
   }
 }
 
 class AerialEdge extends Edge {
   constructor(vertex_a, vertex_b, type) {
-    super(vertex_a, vertex_b, type, 0, true, 0.5);
+    super(vertex_a, vertex_b, type, 0, 0.5, true);
   }
 }
 
@@ -181,14 +216,6 @@ class SingleBitLine  {
     this.line = [];
   }
 
-  createBits_() {
-    for(let z = this.range[0]; z <= this.range[1]; z += graph_intarval) {
-      const pos = this.correctPos_([this.x, this.y, z], space);
-      const qubit = new Cube(pos, this.type);
-      this.line.push(qubit);
-    }
-  }
-
   createEdges_() {
     for(let z = this.range[0]; z <= this.range[1] - graph_intarval; z += graph_intarval) {
       let skip = false;
@@ -216,7 +243,6 @@ class SingleBitLine  {
   }
 
   create() {
-      this.createBits_();
       this.createEdges_();
       return this.line;
   }
@@ -333,7 +359,6 @@ class Braiding {
     this.height = 1 * space;
     this.type = "dual";
     this.color = color
-    this.bits = [];
     this.edges = [];
 
     this.create_();
@@ -344,10 +369,7 @@ class Braiding {
     const mintBitNo = Math.min.apply(null, bitNoArray);
     const maxtBitNo = Math.max.apply(null, bitNoArray);
     const d = (this.cbitNo < this.tbitNoArray[0]) ? 1.0 : -1.0;
-
-    this.push = function(pos, type = this.type) {
-      this.bits.push(new Cube(pos.clone(), type, this.color));
-    }
+    let vertices = [];
 
     // add bridge
     let upper = new Vector3D(this.col - space, pitch, this.cbitNo * space);
@@ -364,9 +386,9 @@ class Braiding {
     let pos = new Vector3D(this.col - space * d * 2, 
                            this.height, 
                            this.cbitNo * space  - space * d);
-    this.push(pos);
+    vertices.push(pos.clone());
     pos.z += pitch * d;
-    this.push(pos);
+    vertices.push(pos.clone());
     
     let start = (this.cbitNo < this.tbitNoArray[0]) ? mintBitNo : maxtBitNo;
     const range = (this.cbitNo < this.tbitNoArray[0]) ? maxtBitNo : mintBitNo;
@@ -377,63 +399,61 @@ class Braiding {
         if (this.tbitNoArray.indexOf(z) != -1) {
           if (pos.y != this.height) {
               pos.y -= pitch;
-              this.push(pos)
+              vertices.push(pos.clone())
           }
           pos.z += pitch * d;
-          this.push(pos)
+          vertices.push(pos.clone())
         }
         else {
           if (pos.y == this.height) {
               pos.y += pitch;
-              this.push(pos)
+              vertices.push(pos.clone())
           }
 
           pos.z += pitch * d;
-          this.push(pos)
+          vertices.push(pos.clone())
         }
     }
 
     pos.y += pitch
-    this.push(pos)
+    vertices.push(pos.clone())
     pos.x += pitch * d
-    this.push(pos)
+    vertices.push(pos.clone())
     pos.x += pitch * d
-    this.push(pos)
+    vertices.push(pos.clone())
 
     start = (this.cbitNo < this.tbitNoArray[0]) ? maxtBitNo : mintBitNo;
     for (let z = start; z != this.cbitNo; z -= graph_intarval * d) {
         pos.z -= pitch * d;
-        this.push(pos)
+        vertices.push(pos.clone())
     }
 
     pos.y -= pitch;
-    this.push(pos)
+    vertices.push(pos.clone())
     pos.z -= pitch * d;
-    this.push(pos)
+    vertices.push(pos.clone())
     pos.x -= pitch * d
-    this.push(pos)
+    vertices.push(pos.clone())
 
     // add edge
-    let prev_qubit = this.bits[0];
-    const last_qubit = this.bits[this.bits.length-1];
-    this.edges.push(new Edge(prev_qubit.pos, last_qubit.pos, this.type, this.color));
+    let prev_pos = vertices[0];
+    const last_pos = this.vertices[vertices.length-1];
+    this.edges.push(new Edge(prev_pos, last_pos, this.type, this.color));
     let first = true;
-    for(let qubit of this.bits) {
+    for(let pos of vertices) {
       if (first) {
         first = false;
         continue;
       }
-      let edge = new Edge(prev_qubit.pos, qubit.pos, this.type, this.color);
+      let edge = new Edge(prev_pos, pos, this.type, this.color);
       this.edges.push(edge);
-      prev_qubit = qubit;
+      prev_pos = pos;
     }
   }
 
   apply(scene) {
-    for(let elements of [this.bits, this.edges]) {
-      for(let element of elements) {
-        element.apply(scene);
-      }
+    for(let element of this.edges) {
+      element.apply(scene);
     }
   }
 }
@@ -447,7 +467,6 @@ class BraidingWithBridge {
     this.col = col * space;
     this.height = 1 * space;
     this.type = "dual";
-    this.bits = [];
     this.edges = [];
 
     this.create_();
@@ -458,25 +477,19 @@ class BraidingWithBridge {
     const mintBitNo = Math.min.apply(null, bitNoArray);
     const maxtBitNo = Math.max.apply(null, bitNoArray);
     const d = (this.cbitNo < this.tbitNoArray[0]) ? 1.0 : -1.0;
-
-    this.push = function(pos, type = this.type) {
-      this.bits.push(new Cube(pos.clone(), type));
-    }
+    let vertices = [];
 
     // add bridge
     const upper = new Vector3D(this.col, pitch, this.cbitNo * space);
     const lower = new Vector3D(this.col, 0, this.cbitNo * space);
-    this.push(upper, "primal");
-    this.push(lower, "primal");
-    const edge = new Edge(this.bits[0].pos, this.bits[1].pos, "primal");
+    const edge = new Edge(upper, lower, "primal");
     this.edges.push(edge);
-    this.bits = [];
 
     // add qubit
     let pos = new Vector3D(this.col - space * d, this.height, this.cbitNo * space  - space * d);
-    this.push(pos);
+    vertices.push(pos.clone());
     pos.z += pitch * d;
-    this.push(pos);
+    vertices.push(pos.clone());
     
     let start = (this.cbitNo < this.tbitNoArray[0]) ? mintBitNo : maxtBitNo;
     const range = (this.cbitNo < this.tbitNoArray[0]) ? maxtBitNo : mintBitNo;
@@ -487,59 +500,57 @@ class BraidingWithBridge {
         if (this.tbitNoArray.indexOf(z) != -1) {
           if (pos.y != this.height) {
               pos.y -= pitch;
-              this.push(pos)
+              vertices.push(pos.clone())
           }
           pos.z += pitch * d;
-          this.push(pos)
+          vertices.push(pos.clone())
         }
         else {
           if (pos.y == this.height) {
               pos.y += pitch;
-              this.push(pos)
+              vertices.push(pos.clone())
           }
 
           pos.z += pitch * d;
-          this.push(pos)
+          vertices.push(pos.clone())
         }
     }
 
     pos.y += pitch
-    this.push(pos)
+    vertices.push(pos.clone())
     pos.x += pitch * d
-    this.push(pos)
+    vertices.push(pos.clone())
 
     start = (this.cbitNo < this.tbitNoArray[0]) ? maxtBitNo : mintBitNo;
     for (let z = start; z != this.cbitNo; z -= graph_intarval * d) {
         pos.z -= pitch * d;
-        this.push(pos)
+        vertices.push(pos.clone())
     }
 
     pos.y -= pitch;
-    this.push(pos)
+    vertices.push(pos.clone())
     pos.z -= pitch * d;
-    this.push(pos)
+    vertices.push(pos.clone())
 
     // add edge
-    let prev_qubit = this.bits[0];
-    const last_qubit = this.bits[this.bits.length-1];
-    this.edges.push(new Edge(prev_qubit.pos, last_qubit.pos, this.type));
+    let prev_pos = vertices[0];
+    const last_pos = vertices[vertices.length-1];
+    this.edges.push(new Edge(prev_pos, last_pos, this.type));
     let first = true;
-    for(let qubit of this.bits) {
+    for(let pos of vertices) {
       if (first) {
         first = false;
         continue;
       }
-      let edge = new Edge(prev_qubit.pos, qubit.pos, this.type);
+      let edge = new Edge(prev_pos, pos, this.type);
       this.edges.push(edge);
-      prev_qubit = qubit;
+      prev_pos = pos;
     }
   }
 
   apply(scene) {
-    for(let elements of [this.bits, this.edges]) {
-      for(let element of elements) {
-        element.apply(scene);
-      }
+    for(let element of this.edges) {
+      element.apply(scene);
     }
   }
 }
@@ -595,7 +606,7 @@ class Circuit {
     this.edges.push(edge);
   }
 
-  addAerialCube(aerial_qubit) {
+  addAerialCube(aerial_cube) {
     this.aerial_cubes.push(aerial_cube);
   }
 
@@ -671,17 +682,13 @@ class CircuitFactory {
     for (let vertex_list of vertices) {
       let first = false;
       let last_pos = vertex_list[0];
-      let last_cube = new Cube(last_pos, type, ...visual);
-      this.circuit.addCube(last_cube);
       for (let vertex of vertex_list) {
         if (first) {
           first = false;
           continue;
         }
         const pos = this.correctPos_(vertex, space);
-        const cube = new Cube(pos, type, ...visual);
         const edge = new Edge(last_pos, pos, type, ...visual);
-        this.circuit.addCube(cube);
         this.circuit.addEdge(edge);
         last_pos = pos;
       }
