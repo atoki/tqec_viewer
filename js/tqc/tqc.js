@@ -1,6 +1,9 @@
 'use strict'
 
-var colors = {primal: 0xed1010, dual: 0x180cf7, module: 0xffefd5, pin: 0xffffe0, edge: 0x000000, aerial: 0x008b8b};
+var colors = {primal: 0xed1010, dual: 0x180cf7, module: 0xffefd5, 
+               pin: 0xffffe0, edge: 0x000000, aerial: 0x008b8b};
+// var colors = {primal: 0xffffff, dual: 0x333333, module: 0xffefd5, 
+//               pin: 0xff55ff, edge: 0x000000, aerial: 0x008b8b};
 var scale = 1;
 var margin = 4;         // >= 4
 var pitch = margin + 1;
@@ -10,10 +13,14 @@ var showEdges = true;   // 境界線を見せるか否か
 var line_width = 2;     // 境界線の太さ
 
 class Vector3D {
-  constructor(x, y, z) {
+  constructor(x = 0, y = 0, z = 0) {
     this.x = x;
     this.y = y;
     this.z = z;
+  }
+
+  clone() {
+    return new Vector3D(...this.toArray());
   }
 
   set(x, y, z) {
@@ -22,22 +29,35 @@ class Vector3D {
     this.z = z;
   }
 
+  add(n = 1, base) {
+    let vector3d = this.clone();
+    if (base == 'x') vector3d.x += n;
+    if (base == 'y') vector3d.y += n;
+    if (base == 'z') vector3d.z += n;
+    return vector3d;
+  }
+
+  sub(n = 1, base) {
+    let vector3d = this.clone();
+    if (base == 'x') vector3d.x -= n;
+    if (base == 'y') vector3d.y -= n;
+    if (base == 'z') vector3d.z -= n;
+    return vector3d;
+  }
+
+  changeAxis() {
+    this.x = [this.z, this.z = this.x][0];
+    return this;
+  }
+
   toArray() {
     return [this.x, this.y, this.z];
   }
 }
 
-class Size {
-  constructor(w, h, d) {
-    this.w = w;
-    this.h = h;
-    this.d = d;
-  }
-
-  set(w, h, d) {
-    this.w = w;
-    this.h = h;
-    this.d = d;
+class Size extends Vector3D {
+  constructor(w = 0, h = 0, d = 0) {
+    super(w, h, d);
   }
 
   toArray() {
@@ -45,151 +65,176 @@ class Size {
   }
 }
 
-class Box {
-  constructor(x, y, z, type) {
-    // x軸とz軸を交換してることに注意!!
-    // 右手座標なので奥行きをx軸として方が扱いやすいため
-    this.pos = new Vector3D(z, y, x);
+class Rectangler {
+  constructor(pos, size, type, color = 0, opacity = 1.0, ghost = false) {
+    this.pos = pos;
+    this.size = size;
     this.type = type;
-    this.color = colors[type];
-  }
-
-  x() {
-    return this.pos.x;
-  }
-
-  y() {
-    return this.pos.y;
-  }
-
-  z() {
-    return this.pos.z;
-  }
-}
-
-class LogicalQubit extends Box {
-  constructor(pos, type, color = 0) {
-    super(pos.x, pos.y, pos.z, type);
-    this.ghost = false;
-    this.opacity = 1.0;
-    this.color = (color == 0) ? colors[type] : color
+    this.color = (color == 0) ? colors[type] : color;
+    this.opacity = opacity;
+    this.ghost = ghost;
   }
 
   apply(scene) {
-    var cubeGeometry = new THREE.BoxGeometry(scale, scale, scale);
-    var cubeMaterial = new THREE.MeshPhongMaterial({color: this.color, opacity: this.opacity, transparent: this.ghost});
-    var cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-    cube.position.set(this.x(), this.y(), this.z());
+    const boxGeometry = new THREE.BoxGeometry(this.size.x, this.size.y, this.size.z);
+    const boxMaterial = new THREE.MeshPhongMaterial({color: this.color, opacity: this.opacity, transparent: this.ghost});
+    let box = new THREE.Mesh(boxGeometry, boxMaterial);
+    box.position.set(this.pos.x, this.pos.y, this.pos.z);
 
-    var edge = new THREE.BoxHelper(cube, colors.edge);
+    let edge = new THREE.BoxHelper(box, colors.edge);
     edge.material.linewidth = line_width;
     edge.visible = showEdges;
 
-    scene.add(edge)
-    scene.add(cube);
+    scene.add(box);
+    scene.add(edge);
   }
 }
 
-class Edge {
-  constructor(box1, box2, color = 0) {
-    this.box1 = box1;
-    this.box2 = box2;
-    this.ghost = false;
-    this.opacity = 1.0;
-    this.color = (color == 0) ? box1.color : color
-  }
-
-  apply(scene) {
-    var scale_x = this.box1.x() != this.box2.x() ? margin : scale;
-    var scale_y = this.box1.y() != this.box2.y() ? margin : scale;
-    var scale_z = this.box1.z() != this.box2.z() ? margin : scale;
-    var cubeGeometry = new THREE.BoxGeometry(scale_x, scale_y, scale_z);
-    var cubeMaterial = new THREE.MeshPhongMaterial({color: this.color, opacity: this.opacity, transparent: this.ghost});
-    var cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-
-    cube.position.x = this.box1.x() != this.box2.x() ? (this.box2.x() + this.box1.x()) / 2 : this.box1.x();
-    cube.position.y = this.box1.y() != this.box2.y() ? (this.box2.y() + this.box1.y()) / 2 : this.box1.y();
-    cube.position.z = this.box1.z() != this.box2.z() ? (this.box2.z() + this.box1.z()) / 2 : this.box1.z();
-
-    var edge = new THREE.BoxHelper(cube, colors.edge);
-    edge.material.linewidth = line_width;
-    edge.visible = showEdges;
-
-    scene.add(edge)
-    scene.add(cube);
+class Cube extends Rectangler {
+  constructor(pos, type, ...visual) {
+    super(pos, new Size(scale, scale, scale), type, ...visual);
   }
 }
 
-class AerialQubit extends LogicalQubit {
+class Edge extends Rectangler {
+  constructor(vertex_a, vertex_b, type, ...visual) {
+    const axis = Edge.getAxis_(vertex_a, vertex_b);
+    const pos = Edge.getPos_(vertex_a, vertex_b);
+    const size = Edge.getSize_(vertex_a, vertex_b, axis);
+    super(pos, size, type, ...visual);
+    this.axis = axis;
+  }
+
+  static getAxis_(vertex_a, vertex_b) {
+    if (vertex_a.x != vertex_b.x) return 'x';
+    if (vertex_a.y != vertex_b.y) return 'y';
+    if (vertex_a.z != vertex_b.z) return 'z';
+    console.assert(false, "invalid asis");
+  }
+
+  static getPos_(vertex_a, vertex_b) {
+    const x =  (vertex_b.x + vertex_a.x) / 2;
+    const y =  (vertex_b.y + vertex_a.y) / 2;
+    const z =  (vertex_b.z + vertex_a.z) / 2;
+    return new Vector3D(x, y, z);
+  }
+
+  static getSize_(vertex_a, vertex_b, axis) {
+    const scale_x = axis == 'x' ? Math.abs(vertex_a.x - vertex_b.x) - 1.0 : scale;
+    const scale_y = axis == 'y' ? Math.abs(vertex_a.y - vertex_b.y) - 1.0 : scale;
+    const scale_z = axis == 'z' ? Math.abs(vertex_a.z - vertex_b.z) - 1.0 : scale;
+    return new Size(scale_x, scale_y, scale_z);
+  }
+}
+
+class AerialCube extends Cube {
   constructor(pos, type) {
-    super(pos, type);
-    this.ghost = true;
-    this.opacity = 0.5;
+    super(pos, type, 0, true, 0.5);
   }
 }
 
-class AerialWire extends Edge {
-  constructor(box1, box2) {
-    super(box1, box2);
-    this.ghost = true;
-    this.opacity = 0.5;
+class AerialEdge extends Edge {
+  constructor(vertex_a, vertex_b, type) {
+    super(vertex_a, vertex_b, type, 0, true, 0.5);
+  }
+}
+
+class SquarePyramid {
+  constructor(pos, height, axis, reverse, type, color = 0, opacity = 1.0, ghost = false) {
+    this.pos = pos;
+    this.height = height;
+    this.axis = axis;
+    this.size = new Size(scale / Math.SQRT2, height, 4);
+    this.reverse = reverse;
+    this.type = type;
+    this.color = (color == 0) ? colors[type] : color;
+    this.opacity = opacity;
+    this.ghost = ghost;
+  }
+
+  apply(scene) {
+    const coneGeometry = new THREE.ConeGeometry(this.size.x, this.size.y, this.size.z);
+    const meshMat = new THREE.MeshPhongMaterial({color: this.color, opacity: this.opacity, transparent: this.ghost});
+    let wireFrameMat = new THREE.MeshPhongMaterial({color: colors.edge, wireframe: true});
+    wireFrameMat.wireframeLinewidth = line_width;
+    wireFrameMat.visible = showEdges;
+    let cone = THREE.SceneUtils.createMultiMaterialObject(coneGeometry, [meshMat, wireFrameMat]);
+    cone.position.set(this.pos.x, this.pos.y, this.pos.z);
+
+    const r = this.reverse ? Math.PI : 0;
+    if(this.axis === 'x')      cone.rotation.set(Math.PI / 4, 0, Math.PI / 2 - r);
+    else if(this.axis === 'y') cone.rotation.set(r + Math.PI, Math.PI / 4, 0);
+    else if(this.axis === 'z') cone.rotation.set(r - Math.PI / 2, Math.PI / 4, 0);
+    
+    scene.add(cone);
   }
 }
 
 class SingleBitLine  {
-  constructor(z, range, y, cbits) {
-    this.z = z;
+  constructor(x, range, y, cbits) {
+    this.x = x;
     this.range = range;
     this.y = y;
     this.cbits = cbits;
     this.type = "primal";
-    // line array is LogicalQubits and Edges
     this.line = [];
   }
 
-  _createBits() {
-    for(let x = this.range[0]; x <= this.range[1]; x += graph_intarval) {
-      let pos = new Vector3D(x * space, this.y * space, this.z * space);
-      let qubit = new LogicalQubit(pos, this.type);
+  createBits_() {
+    for(let z = this.range[0]; z <= this.range[1]; z += graph_intarval) {
+      const pos = this.correctPos_([this.x, this.y, z], space);
+      const qubit = new Cube(pos, this.type);
       this.line.push(qubit);
     }
   }
 
-  _createEdges() {
-    for(let x = this.range[0]; x <= this.range[1] - graph_intarval; x += graph_intarval) {
-      var skip = false;
+  createEdges_() {
+    for(let z = this.range[0]; z <= this.range[1] - graph_intarval; z += graph_intarval) {
+      let skip = false;
       for (let cbit of this.cbits) {
-        if (this.z == cbit.control && x + 1 == cbit.column) {
+        if (this.x == cbit.control && z + 1 == cbit.column) {
           skip = true;
         }
       }
       if (skip) continue;
 
-      let pos1 = new Vector3D(x * space, this.y * space, this.z * space);
-      let pos2 = new Vector3D((x + graph_intarval) * space, this.y * space, this.z * space);
-      let qubit1 = new LogicalQubit(pos1, this.type);
-      let qubit2 = new LogicalQubit(pos2, this.type);
-      let edge = new Edge(qubit1, qubit2);
+      const pos1 = this.correctPos_([this.x, this.y, z], space);
+      const pos2 = this.correctPos_([this.x, this.y, z + graph_intarval], space);
+      const edge = new Edge(pos1, pos2, this.type);
       this.line.push(edge);
     }
   }
 
+  correctPos_(pos, space) {
+    const corrected_pos = new Vector3D();
+    corrected_pos.x = pos[0] * space;
+    corrected_pos.y = pos[1] * space;
+    corrected_pos.z = pos[2] * space;
+    corrected_pos.changeAxis(); // 軸変更
+    return corrected_pos;
+  }
+
   create() {
-      this._createBits();
-      this._createEdges();
+      this.createBits_();
+      this.createEdges_();
       return this.line;
   }
 }
 
 class BitLine {
-  constructor(z, range, cbits) {
-    this.z = z;
+  constructor(row, range, layer, cbits) {
+    this.row = row;
     this.range = range;
     this.cbits = cbits;
+    this.layer = layer
     this.lines = [];
 
-    var upper_line = new SingleBitLine(z, range, graph_intarval, this.cbits);
-    var lower_line = new SingleBitLine(z, range, 0, this.cbits);
+    const upper_line = new SingleBitLine(row, range, 
+                                         layer * margin, 
+                                         this.cbits);
+    const lower_line = new SingleBitLine(row, range, 
+                                         layer * margin + graph_intarval, 
+                                         this.cbits);
     this.lines.push(upper_line.create());
     this.lines.push(lower_line.create());
   }
@@ -204,142 +249,80 @@ class BitLine {
 }
 
 class Injector {
-  constructor(box1, box2) {
-    this.box1 = box1;
-    this.box2 = box2;
-    this.color = box1.color;
-    //'#'+Math.floor(Math.random()*16777215).toString(16); 
-    this.angles = {1: 'none', 2: 'none'};
-    // distance between two boxes
-    this.distance = 0.0;
-    this.ghost = false;
-
-    // calc agnle and distance
-    this._calcAngle();
+  constructor(vertex_a, vertex_b, type, color = 0, opacity = 0.1, ghost = false) {
+    let vertices = [vertex_a, vertex_b].sort(function(a, b) {
+      if(a.z < b.z) return -1;
+      if(a.z > b.z) return 1;
+      if(a.y < b.y) return -1;
+      if(a.y > b.y) return 1;
+      if(a.x < b.x) return -1;
+      if(a.x > b.x) return 1;
+      return 0;
+    });
+    this.vertices = vertices;
+    // distance between two cubees
+    this.distance = Math.max(Math.abs(this.vertices[0].x - this.vertices[1].x),
+                            Math.abs(this.vertices[0].y - this.vertices[1].y),
+                            Math.abs(this.vertices[0].z - this.vertices[1].z))
+    this.axis = this.getAxis_();
+    this.type = type;
+    this.color = color;
+    this.opacity = opacity;
+    this.ghost = ghost;
   }
 
-  _calcAngle() {
-    // diff x
-    if (Math.abs(this.box1.x() - this.box2.x()) > 0) {
-      this.distance = Math.abs(this.box1.x() - this.box2.x());
-      if (this.box1.x() > this.box2.x()) {
-        this.angles[1] = 'left';
-        this.angles[2] = 'right';
-      }
-      else {
-        this.angles[1] = 'right';
-        this.angles[2] = 'left';
-      }
-    }
-    // diff y
-    else if (Math.abs(this.box1.y() - this.box2.y()) > 0) {
-      this.distance = Math.abs(this.box1.y() - this.box2.y());
-      if (this.box1.y() > this.box2.y()) {
-        this.angles[1] = 'back';
-        this.angles[2] = 'front';
-      }
-      else {
-        this.angles[1] = 'front';
-        this.angles[2] = 'back';
-      }
-    }
-    // diff z
-    else {
-      this.distance = Math.abs(this.box1.z() - this.box2.z());
-      if (this.box1.z() > this.box2.z()) {
-        this.angles[1] = 'down';
-        this.angles[2] = 'up';
-      }
-      else {
-        this.angles[1] = 'up';
-        this.angles[2] = 'down';
-      }
-    }
+  getAxis_() {
+    if (this.vertices[0].x != this.vertices[1].x) return 'x';
+    if (this.vertices[0].y != this.vertices[1].y) return 'y';
+    if (this.vertices[0].z != this.vertices[1].z) return 'z';
+    console.assert(false, "invalid asis");
+  }
+
+  getVisual() {
+    return [this.color, this.opacity, this.ghost];
   }
 
   apply(scene) {
-    for(let mesh of this._createBoxes()) {
-      var edge = new THREE.BoxHelper(mesh, colors.edge);
-      edge.material.linewidth = line_width;
-      edge.visible = showEdges;
-
-      scene.add(edge);
-      scene.add(mesh)
+    for(let cube of this.createCubes_()) {
+      cube.apply(scene);
     }
 
-    for(let mesh of this._createCones()) {
-      scene.add(mesh)
+    for(let cone of this.createCones_()) {
+      cone.apply(scene)
     }
   }
 
-  _createCones() {
-    var cone1 = this._createConeMesh(this.box1, 1);
-    var cone2 = this._createConeMesh(this.box2, 2);
-
-    return [cone1, cone2];
-  }
-
-  _createBoxes() {
-    var cube1 = this._createBoxMesh(this.box1, 1);
-    var cube2 = this._createBoxMesh(this.box2, 2);
+  createCubes_() {
+    const pos1 = this.vertices[0].add(1, this.axis);
+    const pos2 = this.vertices[1].sub(1, this.axis);
+    const cube1 = new Cube(pos1, this.type, ...this.getVisual());
+    const cube2 = new Cube(pos2, this.type, ...this.getVisual());
 
     return [cube1, cube2];
   }
 
-  _createBoxMesh(box, id) {
-    var cubeGeometry = new THREE.BoxGeometry(scale, scale, scale);
-    var cubeMaterial = new THREE.MeshPhongMaterial({color: this.color, opacity: 0.1, transparent: this.ghost});
-    var cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+  createCones_() {
+    const height = (this.distance - scale * 2.0 - 1.0) / 2.0;
+    const diff = ((this.distance * 0.5) - (scale * 1.5)) / 2.0 + scale * 1.5;
+    let pos1 = this.vertices[1].sub(diff, this.axis);
+    let pos2 = this.vertices[0].add(diff, this.axis);
 
-    var nx = {'right': scale, 'left': -scale, 'front': 0, 'back': 0, 'up': 0, 'down': 0 };
-    var ny = {'right': 0, 'left': 0, 'front': scale, 'back': -scale, 'up': 0, 'down': 0 };
-    var nz = {'right': 0, 'left': 0, 'front': 0, 'back': 0, 'up': scale, 'down': -scale };
+    const cone1 = new SquarePyramid(pos1, height, this.axis, false, this.type, ...this.getVisual());
+    const cone2 = new SquarePyramid(pos2, height, this.axis, true, this.type, ...this.getVisual());
 
-    cube.position.set(box.x() + nx[this.angles[id]], box.y() 
-                      + ny[this.angles[id]], box.z() + nz[this.angles[id]]);
-
-    return cube;
-  }
-
-  _createConeMesh(box, id) {
-    var height = (this.distance - scale * 2.0 - 1.0) / 2.0;
-    var coneGeometry = new THREE.ConeGeometry(scale/ Math.SQRT2, height, 4);
-    var meshMat = new THREE.MeshPhongMaterial({color: this.color, opacity: 0.1, transparent: this.ghost});
-    var wireFrameMat = new THREE.MeshPhongMaterial({color: colors.edge, wireframe: true});
-    wireFrameMat.wireframeLinewidth = line_width;
-    wireFrameMat.visible = showEdges;
-    var cone = THREE.SceneUtils.createMultiMaterialObject(coneGeometry, [meshMat, wireFrameMat]);
-    //var cone = new THREE.Mesh(coneGeometry, wireFrameMat);
-
-    var diff = ((this.distance * 0.5) - (scale * 1.5)) / 2.0 + scale * 1.5;
-    var nx = {'right': diff, 'left': -diff, 'front': 0, 'back': 0, 'up': 0, 'down': 0 };
-    var ny = {'right': 0, 'left': 0, 'front': diff, 'back': -diff, 'up': 0, 'down': 0 };
-    var nz = {'right': 0, 'left': 0, 'front': 0, 'back': 0, 'up': diff, 'down': -diff };
-
-    var rx = {'right': 0.25, 'left': 0.25, 'front': 0, 'back': -1, 'up': 0.5, 'down': -0.5 };
-    var ry = {'right': 0, 'left': 0, 'front': 0.25, 'back': 0.25, 'up': 0.25, 'down': 0.25 };
-    var rz = {'right': -0.5, 'left': 0.5, 'front': 0, 'back': 0, 'up': 0, 'down': 0 };
-
-    cone.position.set(box.x() + nx[this.angles[id]], box.y() + ny[this.angles[id]], 
-                      box.z() + nz[this.angles[id]]);
-    cone.rotation.set(Math.PI * rx[this.angles[id]], Math.PI * ry[this.angles[id]], 
-                      Math.PI * rz[this.angles[id]]);
-    
-    return cone;
-  }
-}
-
-class Cap extends Injector {
-  constructor(box1, box2) {
-    super(box1, box2);
-    this.ghost = true;
+    return [cone1, cone2];
   }
 }
 
 class Pin extends Injector {
-  constructor(box1, box2) {
-    super(box1, box2);
-    this.color = colors.pin;
+  constructor(vertex_a, vertex_b, type, color = colors.pin) {
+    super(vertex_a, vertex_b, type, color);
+  }
+}
+
+class Cap extends Injector {
+  constructor(vertex_a, vertex_b, type) {
+    super(vertex_a, vertex_b, type, colors[type], 0.1, true);
   }
 }
 
@@ -356,44 +339,40 @@ class Braiding {
     this.bits = [];
     this.edges = [];
 
-    this._create();
+    this.create_();
   }
 
-  _create() {
-    var bitNoArray = this.tbitNoArray.concat([this.cbitNo]);
-    var mintBitNo = Math.min.apply(null, bitNoArray);
-    var maxtBitNo = Math.max.apply(null, bitNoArray);
-    var d = (this.cbitNo < this.tbitNoArray[0]) ? 1.0 : -1.0;
+  create_() {
+    const bitNoArray = this.tbitNoArray.concat([this.cbitNo]);
+    const mintBitNo = Math.min.apply(null, bitNoArray);
+    const maxtBitNo = Math.max.apply(null, bitNoArray);
+    const d = (this.cbitNo < this.tbitNoArray[0]) ? 1.0 : -1.0;
 
     this.push = function(pos, type = this.type) {
-      this.bits.push(new LogicalQubit(pos, type, this.color));
+      this.bits.push(new Cube(pos.clone(), type, this.color));
     }
 
     // add bridge
-    var upper = new Vector3D(this.col - space, pitch, this.cbitNo * space);
-    var lower = new Vector3D(this.col - space, 0, this.cbitNo * space);
-    var qubit1 = new LogicalQubit(upper, "primal");
-    var qubit2 = new LogicalQubit(lower, "primal");
-    var edge = new Edge(qubit1, qubit2);
+    let upper = new Vector3D(this.col - space, pitch, this.cbitNo * space);
+    let lower = new Vector3D(this.col - space, 0, this.cbitNo * space);
+    let edge = new Edge(upper, lower, "primal");
     this.edges.push(edge);
 
     upper = new Vector3D(this.col + space, pitch, this.cbitNo * space);
     lower = new Vector3D(this.col + space, 0, this.cbitNo * space);
-    qubit1 = new LogicalQubit(upper, "primal");
-    qubit2 = new LogicalQubit(lower, "primal");
-    edge = new Edge(qubit1, qubit2);
+    edge = new Edge(upper, lower, "primal");
     this.edges.push(edge);
 
     // add qubit
-    var pos = new Vector3D(this.col - space * d * 2, 
-                      this.height, 
-                      this.cbitNo * space  - space * d);
+    let pos = new Vector3D(this.col - space * d * 2, 
+                           this.height, 
+                           this.cbitNo * space  - space * d);
     this.push(pos);
     pos.z += pitch * d;
     this.push(pos);
     
-    var start = (this.cbitNo < this.tbitNoArray[0]) ? mintBitNo : maxtBitNo;
-    var range = (this.cbitNo < this.tbitNoArray[0]) ? maxtBitNo : mintBitNo;
+    let start = (this.cbitNo < this.tbitNoArray[0]) ? mintBitNo : maxtBitNo;
+    const range = (this.cbitNo < this.tbitNoArray[0]) ? maxtBitNo : mintBitNo;
     for (let z = start + graph_intarval * d; 
          z != range + graph_intarval * d; 
          z += graph_intarval * d){
@@ -438,16 +417,16 @@ class Braiding {
     this.push(pos)
 
     // add edge
-    var prev_qubit = this.bits[0];
-    var last_qubit = this.bits[this.bits.length-1];
-    this.edges.push(new Edge(prev_qubit, last_qubit, this.color));
-    var first = true;
+    let prev_qubit = this.bits[0];
+    const last_qubit = this.bits[this.bits.length-1];
+    this.edges.push(new Edge(prev_qubit.pos, last_qubit.pos, this.type, this.color));
+    let first = true;
     for(let qubit of this.bits) {
       if (first) {
         first = false;
         continue;
       }
-      let edge = new Edge(prev_qubit, qubit, this.color);
+      let edge = new Edge(prev_qubit.pos, qubit.pos, this.type, this.color);
       this.edges.push(edge);
       prev_qubit = qubit;
     }
@@ -474,36 +453,36 @@ class BraidingWithBridge {
     this.bits = [];
     this.edges = [];
 
-    this._create();
+    this.create_();
   }
 
-  _create() {
-    var bitNoArray = this.tbitNoArray.concat([this.cbitNo]);
-    var mintBitNo = Math.min.apply(null, bitNoArray);
-    var maxtBitNo = Math.max.apply(null, bitNoArray);
-    var d = (this.cbitNo < this.tbitNoArray[0]) ? 1.0 : -1.0;
+  create_() {
+    const bitNoArray = this.tbitNoArray.concat([this.cbitNo]);
+    const mintBitNo = Math.min.apply(null, bitNoArray);
+    const maxtBitNo = Math.max.apply(null, bitNoArray);
+    const d = (this.cbitNo < this.tbitNoArray[0]) ? 1.0 : -1.0;
 
     this.push = function(pos, type = this.type) {
-      this.bits.push(new LogicalQubit(pos, type));
+      this.bits.push(new Cube(pos.clone(), type));
     }
 
     // add bridge
-    var upper = new Vector3D(this.col, pitch, this.cbitNo * space);
-    var lower = new Vector3D(this.col, 0, this.cbitNo * space);
+    const upper = new Vector3D(this.col, pitch, this.cbitNo * space);
+    const lower = new Vector3D(this.col, 0, this.cbitNo * space);
     this.push(upper, "primal");
     this.push(lower, "primal");
-    var edge = new Edge(this.bits[0], this.bits[1]);
+    const edge = new Edge(this.bits[0].pos, this.bits[1].pos, "primal");
     this.edges.push(edge);
     this.bits = [];
 
     // add qubit
-    var pos = new Vector3D(this.col - space * d, this.height, this.cbitNo * space  - space * d);
+    let pos = new Vector3D(this.col - space * d, this.height, this.cbitNo * space  - space * d);
     this.push(pos);
     pos.z += pitch * d;
     this.push(pos);
     
-    var start = (this.cbitNo < this.tbitNoArray[0]) ? mintBitNo : maxtBitNo;
-    var range = (this.cbitNo < this.tbitNoArray[0]) ? maxtBitNo : mintBitNo;
+    let start = (this.cbitNo < this.tbitNoArray[0]) ? mintBitNo : maxtBitNo;
+    const range = (this.cbitNo < this.tbitNoArray[0]) ? maxtBitNo : mintBitNo;
     for (let z = start + graph_intarval * d; 
          z != range + graph_intarval * d; 
          z += graph_intarval * d){
@@ -544,16 +523,16 @@ class BraidingWithBridge {
     this.push(pos)
 
     // add edge
-    var prev_qubit = this.bits[0];
-    var last_qubit = this.bits[this.bits.length-1];
-    this.edges.push(new Edge(prev_qubit, last_qubit));
-    var first = true;
+    let prev_qubit = this.bits[0];
+    const last_qubit = this.bits[this.bits.length-1];
+    this.edges.push(new Edge(prev_qubit.pos, last_qubit.pos, this.type));
+    let first = true;
     for(let qubit of this.bits) {
       if (first) {
         first = false;
         continue;
       }
-      let edge = new Edge(prev_qubit, qubit);
+      let edge = new Edge(prev_qubit.pos, qubit.pos, this.type);
       this.edges.push(edge);
       prev_qubit = qubit;
     }
@@ -577,21 +556,21 @@ class Module {
   }
 
   apply(scene) {
-    var cube = this._createMesh();
-    var edge = new THREE.BoxHelper(cube, colors.edge);
+    const cube = this.createMesh_();
+    let edge = new THREE.BoxHelper(cube, colors.edge);
     edge.material.linewidth = line_width;
 
     scene.add(cube);
     scene.add(edge)
   }
 
-  _createMesh() {
-    var w = this.size.w * scale;
-    var h = this.size.h * scale;
-    var d = this.size.d * scale;
-    var cubeGeometry = new THREE.BoxGeometry(w, h, d);
-    var cubeMaterial = new THREE.MeshPhongMaterial({color: this.color, opacity: 0.3, transparent: this.ghost});
-    var cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+  createMesh_() {
+    const w = this.size.w * scale;
+    const h = this.size.h * scale;
+    const d = this.size.d * scale;
+    const cubeGeometry = new THREE.BoxGeometry(w, h, d);
+    const cubeMaterial = new THREE.MeshPhongMaterial({color: this.color, opacity: 0.3, transparent: this.ghost});
+    let cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
     cube.position.set(this.pos.x, this.pos.y, this.pos.z);
 
     return cube;
@@ -601,29 +580,30 @@ class Module {
 class Circuit {
   constructor() {
     this.logical_qubits = [];
+    this.cubes = [];
     this.edges = [];
-    this.aerial_qubits = [];
-    this.aerial_wires = [];
+    this.aerial_cubes = [];
+    this.aerial_edges = [];
     this.bit_lines = [];
     this.injectors = [];
     this.braidings = [];
     this.modules = [];
   }
 
-  addLogicalQubit(logical_qubit) {
-    this.logical_qubits.push(logical_qubit);
+  addCube(cube) {
+    this.cubes.push(cube);
   }
 
   addEdge(edge) {
     this.edges.push(edge);
   }
 
-  addAerialQubit(aerial_qubit) {
-    this.aerial_qubits.push(aerial_qubit);
+  addAerialCube(aerial_qubit) {
+    this.aerial_cubes.push(aerial_cube);
   }
 
-  addAerialWire(aerial_wire) {
-    this.aerial_wires.push(aerial_wire);
+  addAerialEdge(aerial_edge) {
+    this.aerial_edges.push(aerial_edge);
   }
 
   addBitLine(bit_line) {
@@ -643,7 +623,7 @@ class Circuit {
   }
 
   apply(scene) {
-    for(let elements of [this.logical_qubits, this.edges, this.aerial_qubits, this.aerial_wires, this.injectors, this.bit_lines, this.braidings, this.modules]) {
+    for(let elements of [this.cubes, this.edges, this.aerial_cubes, this.aerial_edges, this.injectors, this.bit_lines, this.braidings, this.modules]) {
       for(let element of elements) {
         element.apply(scene);
       }
@@ -658,191 +638,262 @@ class CircuitFactory {
 
   create() {
     this.circuit = new Circuit();
-    this._createLogicalQubits();
-    this._createEdges();
-    this._createBitLines();
-    this._createInjectors();
-    this._createBraidings();
-    this._createAerialQubits();
-    this._createAerialWires();
-    this._createModules();
+    this.createLogicalQubits_();
+    this.createCubes_();
+    this.createEdges_();
+    this.createBitLines_();
+    this.createInjectors_();
+    this.createBraidings_();
+    this.createAerialCubes_();
+    this.createAerialEdges_();
+    this.createModules_();
 
     return this.circuit;
   }
 
-  _createLogicalQubits() {
-    if(!this.data.logical_qubits) {
+  createLogicalQubits_(){
+    if (!this.data.logical_qubits) {
       return;
-    }
-    for(let qubit of this.data.logical_qubits) {
-      var pos = new Vector3D(qubit.pos[0] * space, qubit.pos[1] * space, qubit.pos[2] * space);
-      var type = qubit.type;
-      var color = qubit.color ? qubit.color : 0;
-      var lq = new LogicalQubit(pos, type, color);
-      this.circuit.addLogicalQubit(lq);
+    };
+    for (let logical_qubit of this.data.logical_qubits) {
+      const id = logical_qubit.id;
+      const type = logical_qubit.type;
+      this.createBlocks_(type, logical_qubit.blocks);
+      this.createInjectorsInLogicalQubit_(type, logical_qubit.injectors);
+      this.createCapsInLogicalQubit_(type, logical_qubit.caps);
     }
   }
 
-  _createEdges() {
+  createBlocks_(type, blocks = []) {
+    let vertices = [];
+    let visual = [];
+    for (let block of blocks) {
+      if (Array.isArray(block)) vertices.push(block);
+      if ("visual" in block) visual = this.parseVisual_(block.visual);
+    }
+    for (let vertex_list of vertices) {
+      let first = false;
+      let last_pos = vertex_list[0];
+      let last_cube = new Cube(last_pos, type, ...visual);
+      this.circuit.addCube(last_cube);
+      for (let vertex of vertex_list) {
+        if (first) {
+          first = false;
+          continue;
+        }
+        const pos = this.correctPos_(vertex, space);
+        const cube = new Cube(pos, type, ...visual);
+        const edge = new Edge(last_pos, pos, type, ...visual);
+        this.circuit.addCube(cube);
+        this.circuit.addEdge(edge);
+        last_pos = pos;
+      }
+    }
+  }
+
+  createInjectorsInLogicalQubit_(type, injectors = []) {
+    for (let injector of injectors) {
+      const pos1 = this.correctPos_(injector.vertices[0], space);
+      const pos2 = this.correctPos_(injector.vertices[1], space);
+      const visual = injector.visual ? this.parseVisual_(injector.visual) : [];
+      const pin = new Pin(pos1, pos2, type, ...visual);
+      this.circuit.addInjector(pin);
+    }
+  }
+
+  createCapsInLogicalQubit_(type, caps = []) {
+    for (let injector of caps) {
+      const pos1 = this.correctPos_(injector.vertices[0], space);
+      const pos2 = this.correctPos_(injector.vertices[1], space);
+      const visual = injector.visual ? this.parseVisual_(injector.visual) : [];
+      const cap = new Cap(pos1, pos2, type, ...visual);
+      this.circuit.addInjector(cap);
+    }
+  }
+
+  createCubes_() {
+    if(!this.data.cubes) {
+      return;
+    }
+    for(let cube of this.data.cubes) {
+      const pos = this.correctPos_(cube.pos, space);
+      const type = cube.type;
+      const visual = cube.visual ? this.parseVisual_(cube.visual) : [];
+      const c = new Cube(pos, type, ...visual);
+      this.circuit.addCube(c);
+    }
+  }
+
+  createEdges_() {
     if(!this.data.edges) {
       return;
     }
     for(let edge of this.data.edges) {
-      var pos1 = new Vector3D(edge.pos1[0] * space, edge.pos1[1] * space, edge.pos1[2] * space);
-      var pos2 = new Vector3D(edge.pos2[0] * space, edge.pos2[1] * space, edge.pos2[2] * space);
-      var type = edge.type;
-      var logical_qubit1 = new LogicalQubit(pos1, type);
-      var logical_qubit2 = new LogicalQubit(pos2, type);
-      var color = edge.color ? edge.color : 0;
-      var e = new Edge(logical_qubit1, logical_qubit2, color);
+      const pos1 = this.correctPos_(edge.pos1, space);
+      const pos2 = this.correctPos_(edge.pos2, space);
+      const type = edge.type;
+      const visual = edge.visual ? this.parseVisual_(edge.visual) : [];
+      const e = new Edge(pos1, pos2, type, ...visual);
       this.circuit.addEdge(e);
     }
   }
 
-  _createAerialQubits() {
-    if(!this.data.aerial_qubits) {
+  createAerialCubes_() {
+    if(!this.data.aerial_cubes) {
       return;
     }
-    for(let qubit of this.data.aerial_qubits) {
-      var pos = new Vector3D(qubit.pos[0] * space, qubit.pos[1] * space, qubit.pos[2] * space);
-      var type = "aerial"
-      var aq = new AerialQubit(pos, type);
-      this.circuit.addAerialQubit(aq);
+    const type = "aerial"
+    for(let cube of this.data.aerial_cubes) {
+      const pos = this.correctPos_(cube, space);
+      const c = new AerialCube(pos, type);
+      this.circuit.addAerialCube(c);
     }
   }
 
-  _createAerialWires() {
-    if(!this.data.aerial_wires) {
+  createAerialEdges_() {
+    if(!this.data.aerial_edges) {
       return;
     }
-    for(let wire of this.data.aerial_wires) {
-      var pos1 = new Vector3D(wire.pos1[0] * space, wire.pos1[1] * space, wire.pos1[2] * space);
-      var pos2 = new Vector3D(wire.pos2[0] * space, wire.pos2[1] * space, wire.pos2[2] * space);
-      var type = "aerial"
-      var logical_qubit1 = new LogicalQubit(pos1, type);
-      var logical_qubit2 = new LogicalQubit(pos2, type);
-      var w = new AerialWire(logical_qubit1, logical_qubit2);
-      this.circuit.addAerialWire(w);
+    const type = "aerial"
+    for(let edge of this.data.aerial_edges) {
+      const pos1 = this.correctPos_(edge.pos1, space);
+      const pos2 = this.correctPos_(edge.pos2, space);
+      const e = new AerialEdge(pos1, pos2, type);
+      this.circuit.addAerialEdge(e);
     }
   }
 
-  /*
-    "row": 0,
-    "range": [0, 9],
-    "caps": [0],
-    "pins": [8],
-    "bridges": [9]
-  */
-  _createBitLines() {
+  createBitLines_() {
     if(!this.data.bit_lines) {
       return;
     }
+    const type = "primal";
     for(let line of this.data.bit_lines) {
       // bit line
-      var cbits = []
+      let cbits = []
       if(this.data.braidings) {
         for (let braiding of this.data.braidings) {
           cbits.push({'control': braiding.control, 'column': braiding.column});
         }  
       }
       
-      var l = new BitLine(line.row, line.range, cbits);
+      const l = new BitLine(line.row, line.range, line.layer, cbits);
       this.circuit.addBitLine(l);
 
       // bridges
       if (!line.bridges) {
         line.bridges = [];
       }
-      for(let x of line.bridges) {
-        var pos1 = new Vector3D(x * space, 0 * space, line.row * space);
-        var pos2 = new Vector3D(x * space, 2 * space, line.row * space);
-        var type = "primal";
-        var logical_qubit1 = new LogicalQubit(pos1, type);
-        var logical_qubit2 = new LogicalQubit(pos2, type);
-        var e = new Edge(logical_qubit1, logical_qubit2);
+      for(let z of line.bridges) {
+        const pos1 = new Vector3D(line.row * space, 
+                                  line.layer * margin * space, 
+                                  z * space).changeAxis();
+        const pos2 = new Vector3D(line.row * space, 
+                                  (line.layer * margin + graph_intarval) * space, 
+                                  z * space).changeAxis();
+        const e = new Edge(pos1, pos2, type);
         this.circuit.addEdge(e);
-      }
-
-      // caps
-      if (!line.caps) {
-        line.caps = [];
-      }
-      for(let x of line.caps) {
-        var pos1 = new Vector3D(x * space, 0 * space, line.row * space);
-        var pos2 = new Vector3D(x * space, 2 * space, line.row * space);
-        var type = "primal";
-        var logical_qubit1 = new LogicalQubit(pos1, type);
-        var logical_qubit2 = new LogicalQubit(pos2, type);
-        var cap = new Cap(logical_qubit1, logical_qubit2);
-        this.circuit.addInjector(cap);
       }
 
       // pins
       if (!line.pins) {
         line.pins = [];
       }
-      for(let x of line.pins) {
-        var pos1 = new Vector3D(x * space, 0 * space, line.row * space);
-        var pos2 = new Vector3D(x * space, 2 * space, line.row * space);
-        var type = "primal";
-        var logical_qubit1 = new LogicalQubit(pos1, type);
-        var logical_qubit2 = new LogicalQubit(pos2, type);
-        var pin = new Pin(logical_qubit1, logical_qubit2);
+      for(let z of line.pins) {
+        const pos1 = new Vector3D(line.row * space, 
+                                  line.layer * margin * space, 
+                                  z * space).changeAxis();
+        const pos2 = new Vector3D(line.row * space, 
+                                  (line.layer * margin + graph_intarval) * space, 
+                                  z * space).changeAxis();
+        const pin = new Pin(pos1, pos2, type);
         this.circuit.addInjector(pin);
       }
-    }
-  }
 
-  _createInjectors() {
-    if(!this.data.injectors) {
-      return;
-    }
-    for(let injector of this.data.injectors) {
-      var pos1 = new Vector3D(injector.pos1[0] * space, injector.pos1[1] * space, injector.pos1[2] * space);
-      var pos2 = new Vector3D(injector.pos2[0] * space, injector.pos2[1] * space, injector.pos2[2] * space);
-      var type = injector.type;
-      var logical_qubit1 = new LogicalQubit(pos1, type);
-      var logical_qubit2 = new LogicalQubit(pos2, type);
-
-      if (injector.category == "pin") {
-        var pin = new Pin(logical_qubit1, logical_qubit2);
-        this.circuit.addInjector(pin);
+      // caps
+      if (!line.caps) {
+        line.caps = [];
       }
-      else {
-        var cap = new Cap(logical_qubit1, logical_qubit2);
+      for(let z of line.caps) {
+        const pos1 = new Vector3D(line.row * space, 
+                                  line.layer * margin * space, 
+                                  z * space).changeAxis();
+        const pos2 = new Vector3D(line.row * space, 
+                                  (line.layer * margin + graph_intarval) * space, 
+                                  z * space).changeAxis();
+        const cap = new Cap(pos1, pos2, type);
         this.circuit.addInjector(cap);
       }
     }
   }
 
-  _createBraidings() {
+  createInjectors_() {
+    if(!this.data.injectors) {
+      return;
+    }
+    for(let injector of this.data.injectors) {
+      const pos1 = this.correctPos_(injector.pos1, space);
+      const pos2 = this.correctPos_(injector.pos2, space);
+      const type = injector.type;
+      const visual = injector.visual ? this.parseVisual_(injector.visual) : [];
+
+      if (injector.category == "pin") {
+        const pin = new Pin(pos1, pos2, type, ...visual);
+        this.circuit.addInjector(pin);
+      }
+      else {
+        const cap = new Cap(pos1, pos2, type, ...visual);
+        this.circuit.addInjector(cap);
+      }
+    }
+  }
+
+  createBraidings_() {
     if (!this.data.braidings) {
       return;
     }
     for (let braiding of this.data.braidings) {
-      var color = braiding.color ? braiding.color : 0;
-      var b = new Braiding(braiding.control, braiding.targets, braiding.column, color);
+      const color = braiding.color ? braiding.color : 0;
+      // const b = new Braiding(braiding.control, braiding.targets, braiding.column, color);
+      const b = new BraidingWithBridge (braiding.control, braiding.targets, braiding.column, color);
       this.circuit.addBraiding(b);
     }
   }
 
-  _createModules() {
+  createModules_() {
     if (!this.data.modules) {
       return;
     }
     for (let module of this.data.modules) {
-      let size = new Size(module.size[0] * space, module.size[1] * space, module.size[2] * space);
-      let x = module.pos[0] * space + (size.w / 2); 
-      let y = module.pos[1] * space + (size.h / 2);
-      let z = module.pos[2] * space + (size.d / 2);
-      let pos = new Vector3D(x, y, z);
+      const size = new Size(module.size[0] * space, module.size[1] * space, module.size[2] * space);
+      const x = module.pos[0] * space + (size.w / 2); 
+      const y = module.pos[1] * space + (size.h / 2);
+      const z = module.pos[2] * space + (size.d / 2);
+      const pos = new Vector3D(x, y, z);
 
       size.w += 1;
       size.h += 1;
       size.d += 1;
 
-      let m = new Module(pos, size, module.ghost);
+      const m = new Module(pos, size, module.ghost);
       this.circuit.addModule(m);
     }
+  }
+
+  correctPos_(pos, space) {
+    const corrected_pos = new Vector3D();
+    corrected_pos.x = pos[0] * space;
+    corrected_pos.y = pos[1] * space;
+    corrected_pos.z = pos[2] * space;
+    corrected_pos.changeAxis(); // 軸変更
+    return corrected_pos;
+  }
+
+  parseVisual_(data) {
+    let visual = [];
+    if ("color" in data) visual.push(data["color"]);
+    if ("opacity" in data) visual.push(data["opacity"]);
+    if ("ghost" in data) visual.push(data["ghost"]);
+    return visual;
   }
 }

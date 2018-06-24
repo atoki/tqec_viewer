@@ -1,0 +1,23 @@
+{
+    "bit_lines": [
+        {
+            "row": 0,
+            "range": [0, 4],
+            "layer": 0,
+            "caps": [0, 4]
+        },
+        {
+            "row": 2,
+            "range": [0, 4],
+            "layer": 0,
+            "caps": [0, 4]
+        }
+    ],
+    "braidings": [
+        {
+            "control": 0,
+            "targets": [2],
+            "column": 2
+        }
+    ]
+}
