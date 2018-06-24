@@ -1,9 +1,9 @@
 'use strict'
 
-var colors = {primal: 0xed1010, dual: 0x180cf7, module: 0xffefd5, 
-               pin: 0xffffe0, edge: 0x000000, aerial: 0x008b8b};
-// var colors = {primal: 0xffffff, dual: 0x333333, module: 0xffefd5, 
-//               pin: 0xff55ff, edge: 0x000000, aerial: 0x008b8b};
+// var colors = {primal: 0xed1010, dual: 0x180cf7, module: 0xffefd5, 
+//                pin: 0xffffe0, edge: 0x000000, aerial: 0x008b8b};
+var colors = {primal: 0xffffff, dual: 0x333333, module: 0xffefd5, 
+              pin: 0xff55ff, edge: 0x000000, aerial: 0x008b8b};
 var scale = 1;
 var margin = 4;         // >= 4
 var pitch = margin + 1;
