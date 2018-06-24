@@ -177,7 +177,6 @@ class SingleBitLine  {
     this.y = y;
     this.cbits = cbits;
     this.type = "primal";
-    // line array is LogicalQubits and Edges
     this.line = [];
   }
 
@@ -223,15 +222,19 @@ class SingleBitLine  {
 }
 
 class BitLine {
-  constructor(x, range, height, cbits) {
-    this.x = x;
+  constructor(row, range, layer, cbits) {
+    this.row = row;
     this.range = range;
     this.cbits = cbits;
-    this.height = height
+    this.layer = layer
     this.lines = [];
 
-    const upper_line = new SingleBitLine(x, range, height + graph_intarval / 2, this.cbits);
-    const lower_line = new SingleBitLine(x, range, height - graph_intarval / 2, this.cbits);
+    const upper_line = new SingleBitLine(row, range, 
+                                         layer * margin, 
+                                         this.cbits);
+    const lower_line = new SingleBitLine(row, range, 
+                                         layer * margin + graph_intarval, 
+                                         this.cbits);
     this.lines.push(upper_line.create());
     this.lines.push(lower_line.create());
   }
@@ -760,13 +763,6 @@ class CircuitFactory {
     }
   }
 
-  /*
-    "row": x,
-    "range": [z min, z max],
-    "caps": [z, ...],
-    "pins": [z, ...],
-    "bridges": [z, ...]
-  */
   createBitLines_() {
     if(!this.data.bit_lines) {
       return;
@@ -781,7 +777,7 @@ class CircuitFactory {
         }  
       }
       
-      const l = new BitLine(line.row, line.range, line.height, cbits);
+      const l = new BitLine(line.row, line.range, line.layer, cbits);
       this.circuit.addBitLine(l);
 
       // bridges
@@ -790,10 +786,10 @@ class CircuitFactory {
       }
       for(let z of line.bridges) {
         const pos1 = new Vector3D(line.row * space, 
-                                  (line.height - graph_intarval / 2) * space, 
+                                  line.layer * margin * space, 
                                   z * space).changeAxis();
         const pos2 = new Vector3D(line.row * space, 
-                                  (line.height + graph_intarval / 2) * space, 
+                                  (line.layer * margin + graph_intarval) * space, 
                                   z * space).changeAxis();
         const e = new Edge(pos1, pos2, type);
         this.circuit.addEdge(e);
@@ -804,11 +800,11 @@ class CircuitFactory {
         line.pins = [];
       }
       for(let z of line.pins) {
-        const pos1 = new Vector3D(line.row  * space, 
-                                  (line.height - graph_intarval / 2) * space, 
+        const pos1 = new Vector3D(line.row * space, 
+                                  line.layer * margin * space, 
                                   z * space).changeAxis();
-        const pos2 = new Vector3D(line.row  * space, 
-                                  (line.height + graph_intarval / 2) * space, 
+        const pos2 = new Vector3D(line.row * space, 
+                                  (line.layer * margin + graph_intarval) * space, 
                                   z * space).changeAxis();
         const pin = new Pin(pos1, pos2, type);
         this.circuit.addInjector(pin);
@@ -819,11 +815,11 @@ class CircuitFactory {
         line.caps = [];
       }
       for(let z of line.caps) {
-        const pos1 = new Vector3D(line.row  * space, 
-                                  (line.height - graph_intarval / 2) * space, 
+        const pos1 = new Vector3D(line.row * space, 
+                                  line.layer * margin * space, 
                                   z * space).changeAxis();
-        const pos2 = new Vector3D(line.row  * space, 
-                                  (line.height + graph_intarval / 2) * space, 
+        const pos2 = new Vector3D(line.row * space, 
+                                  (line.layer * margin + graph_intarval) * space, 
                                   z * space).changeAxis();
         const cap = new Cap(pos1, pos2, type);
         this.circuit.addInjector(cap);
