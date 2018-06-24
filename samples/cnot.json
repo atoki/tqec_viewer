@@ -3,11 +3,13 @@
         {
             "row": 0,
             "range": [0, 4],
+            "layer": 0,
             "caps": [0, 4]
         },
         {
             "row": 2,
             "range": [0, 4],
+            "layer": 0,
             "caps": [0, 4]
         }
     ],
