@@ -2,7 +2,7 @@
 
 // var colors = {primal: 0xed1010, dual: 0x180cf7, module: 0xffefd5, 
 //                pin: 0xffffe0, edge: 0x000000, aerial: 0x008b8b};
-var colors = {primal: 0xffffff, dual: 0x333333, module: 0xffefd5, 
+var colors = {primal: 0xffffff, dual: 0x333333, module: 0x008b8b, 
               pin: 0xff55ff, edge: 0x000000, aerial: 0x008b8b};
 var scale = 1;
 var margin = 4;         // >= 4
@@ -546,34 +546,19 @@ class BraidingWithBridge {
     }
   }
 }
-
-class Module {
-  constructor(pos, size, ghost) {
-    this.pos = pos;
-    this.size = size;
-    this.ghost = ghost;
-    this.color = colors.aerial;
+  
+class Module extends Rectangler {
+  constructor(pos, size, ...visual) {
+    const pos_ = Module.correctPos_(pos, size);
+    super(pos_, size, "module", ...visual);
   }
 
-  apply(scene) {
-    const cube = this.createMesh_();
-    let edge = new THREE.BoxHelper(cube, colors.edge);
-    edge.material.linewidth = line_width;
-
-    scene.add(cube);
-    scene.add(edge)
-  }
-
-  createMesh_() {
-    const w = this.size.w * scale;
-    const h = this.size.h * scale;
-    const d = this.size.d * scale;
-    const cubeGeometry = new THREE.BoxGeometry(w, h, d);
-    const cubeMaterial = new THREE.MeshPhongMaterial({color: this.color, opacity: 0.3, transparent: this.ghost});
-    let cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-    cube.position.set(this.pos.x, this.pos.y, this.pos.z);
-
-    return cube;
+  static correctPos_(pos, size) {
+    let size_ = {x: size.x, y: size.y, z: size.z};
+    for (let base of ['x', 'y', 'z']) {
+      pos = pos.add(size_[base] / 2.0, base);
+    }
+    return pos;
   }
 }
 
@@ -865,17 +850,13 @@ class CircuitFactory {
       return;
     }
     for (let module of this.data.modules) {
-      const size = new Size(module.size[0] * space, module.size[1] * space, module.size[2] * space);
-      const x = module.pos[0] * space + (size.w / 2); 
-      const y = module.pos[1] * space + (size.h / 2);
-      const z = module.pos[2] * space + (size.d / 2);
-      const pos = new Vector3D(x, y, z);
+      const id = module.id;
+      const size = this.correctPos_(module.size, space);
+      const pos = this.correctPos_(module.pos, space);
+      const visual = module.visual ? this.parseVisual_(module.visual) : [];
+      const description = module.description;
 
-      size.w += 1;
-      size.h += 1;
-      size.d += 1;
-
-      const m = new Module(pos, size, module.ghost);
+      const m = new Module(pos, size, ...visual);
       this.circuit.addModule(m);
     }
   }
@@ -891,9 +872,11 @@ class CircuitFactory {
 
   parseVisual_(data) {
     let visual = [];
-    if ("color" in data) visual.push(data["color"]);
-    if ("opacity" in data) visual.push(data["opacity"]);
-    if ("ghost" in data) visual.push(data["ghost"]);
+    let default_ = {color: 0, opacity: 1.0, ghost: false};
+    for (let property of ["color", "opacity", "ghost"]) {
+      if (property in data) visual.push(data[property]);
+      else visual.push(default_[property]);
+    }
     return visual;
   }
 }
