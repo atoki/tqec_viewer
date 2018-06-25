@@ -546,11 +546,25 @@ class BraidingWithBridge {
     }
   }
 }
-  
+
+class Hadamard extends Rectangler {
+  constructor(pos, ...visual) {
+    console.log(pos.toArray());
+    const size = Hadamard.getSize_();
+    super(pos, size, "dual", ...visual);
+  }
+
+  static getSize_() {
+    let size = new Size(space * 4, space * 3.5, space * 2);
+    size.changeAxis();
+    return size;
+  }
+}
+
 class Module extends Rectangler {
   constructor(pos, size, ...visual) {
     const pos_ = Module.correctPos_(pos, size);
-    super(pos_, size, "module", ...visual);
+    super(pos_, size, "dual", ...visual);
   }
 
   static correctPos_(pos, size) {
@@ -572,6 +586,7 @@ class Circuit {
     this.bit_lines = [];
     this.injectors = [];
     this.braidings = [];
+    this.hadamards = [];
     this.modules = [];
   }
 
@@ -603,12 +618,18 @@ class Circuit {
     this.braidings.push(braiding);
   }
 
+  addHadamard(hadamard) {
+    this.hadamards.push(hadamard);
+  }
+
   addModule(module) {
     this.modules.push(module);
   }
 
   apply(scene) {
-    for(let elements of [this.cubes, this.edges, this.aerial_cubes, this.aerial_edges, this.injectors, this.bit_lines, this.braidings, this.modules]) {
+    for(let elements of [this.cubes, this.edges, this.aerial_cubes, 
+                         this.aerial_edges, this.injectors, this.bit_lines, 
+                         this.braidings, this.hadamards, this.modules]) {
       for(let element of elements) {
         element.apply(scene);
       }
@@ -629,6 +650,7 @@ class CircuitFactory {
     this.createBitLines_();
     this.createInjectors_();
     this.createBraidings_();
+    this.createHadamards_();
     this.createAerialCubes_();
     this.createAerialEdges_();
     this.createModules_();
@@ -845,6 +867,18 @@ class CircuitFactory {
     }
   }
 
+  createHadamards_() {
+    if (!this.data.hadamards) {
+      return;
+    }
+    for (let hadamard of this.data.hadamards) {
+      const pos = this.correctPos_(hadamard.pos, space);
+      const visual = this.parseVisual_(hadamard.visual);
+      const h = new Hadamard(pos, ...visual);
+      this.circuit.addHadamard(h);
+    }
+  }
+
   createModules_() {
     if (!this.data.modules) {
       return;
@@ -871,6 +905,9 @@ class CircuitFactory {
   }
 
   parseVisual_(data) {
+    if (!data) {
+      return [0, 1.0, false];
+    }
     let visual = [];
     let default_ = {color: 0, opacity: 1.0, ghost: false};
     for (let property of ["color", "opacity", "ghost"]) {
