@@ -549,7 +549,6 @@ class BraidingWithBridge {
 
 class Hadamard extends Rectangler {
   constructor(pos, ...visual) {
-    console.log(pos.toArray());
     const size = Hadamard.getSize_();
     super(pos, size, "dual", ...visual);
   }
@@ -562,17 +561,21 @@ class Hadamard extends Rectangler {
 }
 
 class Module extends Rectangler {
-  constructor(pos, size, ...visual) {
-    const pos_ = Module.correctPos_(pos, size);
-    super(pos_, size, "dual", ...visual);
+  constructor(pos, size, rotation, ...visual) {
+    const [pos_, size_] = Module.correctPos_(pos, size, rotation);
+    super(pos_, size_, "module", ...visual);
   }
 
-  static correctPos_(pos, size) {
-    let size_ = {x: size.x, y: size.y, z: size.z};
-    for (let base of ['x', 'y', 'z']) {
-      pos = pos.add(size_[base] / 2.0, base);
+  static correctPos_(pos, size, rotation) {
+    let size_ = {"x": size.x, "y": size.y, "z": size.z};
+    let size_array = [size_[rotation[0]], size_[rotation[1]], size_[rotation[2]]];
+    size.set(size_array[0], size_array[1], size_array[2])
+    let index = 0;
+    for (let base of ["x", "y", "z"]) {
+      pos = pos.add(size_array[index] / 2.0, base);
+      index += 1;
     }
-    return pos;
+    return [pos, size];
   }
 }
 
@@ -887,10 +890,11 @@ class CircuitFactory {
       const id = module.id;
       const size = this.correctPos_(module.size, space);
       const pos = this.correctPos_(module.pos, space);
+      const rotation = module.rotation ? module.rotation : ["x", "y", "z"];
       const visual = module.visual ? this.parseVisual_(module.visual) : [];
       const description = module.description;
 
-      const m = new Module(pos, size, ...visual);
+      const m = new Module(pos, size, rotation, ...visual);
       this.circuit.addModule(m);
     }
   }
