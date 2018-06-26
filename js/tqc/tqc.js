@@ -601,7 +601,7 @@ class Circuit {
     this.edges.push(edge);
   }
 
-  addAerialCube(aerial_qubit) {
+  addAerialCube(aerial_cube) {
     this.aerial_cubes.push(aerial_cube);
   }
 
