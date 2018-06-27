@@ -703,9 +703,16 @@ class CircuitFactory {
 
   createInjectorsInLogicalQubit_(type, injectors = []) {
     for (let injector of injectors) {
-      const pos1 = this.correctPos_(injector.vertices[0], space);
-      const pos2 = this.correctPos_(injector.vertices[1], space);
-      const visual = injector.visual ? this.parseVisual_(injector.visual) : [];
+      let pos1, pos2, visual = [];
+      if (Array.isArray(injector)) {
+        pos1 = this.correctPos_(injector[0], space);
+        pos2 = this.correctPos_(injector[1], space);
+      }
+      else {
+        pos1 = this.correctPos_(injector.vertices[0], space);
+        pos2 = this.correctPos_(injector.vertices[1], space);
+        visual = injector.visual ? this.parseVisual_(injector.visual) : [];
+      }
       const pin = new Pin(pos1, pos2, type, ...visual);
       this.circuit.addInjector(pin);
     }
@@ -713,9 +720,16 @@ class CircuitFactory {
 
   createCapsInLogicalQubit_(type, caps = []) {
     for (let injector of caps) {
-      const pos1 = this.correctPos_(injector.vertices[0], space);
-      const pos2 = this.correctPos_(injector.vertices[1], space);
-      const visual = injector.visual ? this.parseVisual_(injector.visual) : [];
+      let pos1, pos2, visual = [];
+      if (Array.isArray(injector)) {
+        pos1 = this.correctPos_(injector[0], space);
+        pos2 = this.correctPos_(injector[1], space);
+      }
+      else {
+        pos1 = this.correctPos_(injector.vertices[0], space);
+        pos2 = this.correctPos_(injector.vertices[1], space);
+        visual = injector.visual ? this.parseVisual_(injector.visual) : [];
+      }
       const cap = new Cap(pos1, pos2, type, ...visual);
       this.circuit.addInjector(cap);
     }
