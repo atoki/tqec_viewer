@@ -128,14 +128,14 @@ class Edge extends Rectangler {
 }
 
 class AerialCube extends Cube {
-  constructor(pos, type) {
-    super(pos, type, 0, true, 0.5);
+  constructor(pos) {
+    super(pos, "aerial", 0, 0.5, true);
   }
 }
 
 class AerialEdge extends Edge {
-  constructor(vertex_a, vertex_b, type) {
-    super(vertex_a, vertex_b, type, 0, true, 0.5);
+  constructor(vertex_a, vertex_b) {
+    super(vertex_a, vertex_b, "aerial", 0, 0.5, true);
   }
 }
 
@@ -322,7 +322,7 @@ class Pin extends Injector {
 
 class Cap extends Injector {
   constructor(vertex_a, vertex_b, type) {
-    super(vertex_a, vertex_b, type, colors[type], 0.1, true);
+    super(vertex_a, vertex_b, type, colors[type], 0.5, true);
   }
 }
 
@@ -569,7 +569,7 @@ class Module extends Rectangler {
   static correctPos_(pos, size, rotation) {
     let size_ = {"x": size.x, "y": size.y, "z": size.z};
     let size_array = [size_[rotation[0]], size_[rotation[1]], size_[rotation[2]]];
-    size.set(size_array[0], size_array[1], size_array[2])
+    size.set(size_array[0] + scale, size_array[1] + scale, size_array[2] + scale);
     let index = 0;
     for (let base of ["x", "y", "z"]) {
       pos = pos.add(size_array[index] / 2.0, base);
@@ -679,7 +679,13 @@ class CircuitFactory {
     let visual = [];
     for (let block of blocks) {
       if (Array.isArray(block)) vertices.push(block);
-      if ("visual" in block) visual = this.parseVisual_(block.visual);
+      else if ("visual" in block) visual = this.parseVisual_(block.visual);
+      else {
+        const pos1 = this.correctPos_(block.vertices[0], space);
+        const pos2 = this.correctPos_(block.vertices[1], space);
+        const aerial = new AerialEdge(pos1, pos2)
+        this.circuit.addAerialEdge(aerial);
+      }
     }
     for (let vertex_list of vertices) {
       let first = false;
@@ -766,10 +772,9 @@ class CircuitFactory {
     if(!this.data.aerial_cubes) {
       return;
     }
-    const type = "aerial"
     for(let cube of this.data.aerial_cubes) {
       const pos = this.correctPos_(cube, space);
-      const c = new AerialCube(pos, type);
+      const c = new AerialCube(pos);
       this.circuit.addAerialCube(c);
     }
   }
@@ -778,11 +783,10 @@ class CircuitFactory {
     if(!this.data.aerial_edges) {
       return;
     }
-    const type = "aerial"
     for(let edge of this.data.aerial_edges) {
       const pos1 = this.correctPos_(edge.pos1, space);
       const pos2 = this.correctPos_(edge.pos2, space);
-      const e = new AerialEdge(pos1, pos2, type);
+      const e = new AerialEdge(pos1, pos2);
       this.circuit.addAerialEdge(e);
     }
   }
