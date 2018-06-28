@@ -3,7 +3,8 @@
 // var colors = {primal: 0xed1010, dual: 0x180cf7, module: 0xffefd5, 
 //                pin: 0xffffe0, edge: 0x000000, aerial: 0x008b8b};
 var colors = {primal: 0xffffff, dual: 0x333333, module: 0x008b8b, 
-              pin: 0xff55ff, edge: 0x000000, aerial: 0x008b8b};
+              pin: 0xff55ff, edge: 0x000000, aerial: 0x008b8b,
+              a_state_distillation: 0xffff00, y_state_distillation: 0x008000};
 var scale = 1;
 var margin = 4;         // >= 4
 var pitch = margin + 1;
@@ -561,9 +562,9 @@ class Hadamard extends Rectangler {
 }
 
 class Module extends Rectangler {
-  constructor(pos, size, rotation, ...visual) {
+  constructor(pos, size, rotation, type, ...visual) {
     const [pos_, size_] = Module.correctPos_(pos, size, rotation);
-    super(pos_, size_, "module", ...visual);
+    super(pos_, size_, type, ...visual);
   }
 
   static correctPos_(pos, size, rotation) {
@@ -912,7 +913,7 @@ class CircuitFactory {
       const visual = module.visual ? this.parseVisual_(module.visual) : [];
       const description = module.description;
 
-      const m = new Module(pos, size, rotation, ...visual);
+      const m = new Module(pos, size, rotation, id, ...visual);
       this.circuit.addModule(m);
     }
   }
