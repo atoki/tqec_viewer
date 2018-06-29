@@ -46,6 +46,13 @@ class Vector3D {
     return vector3d;
   }
 
+  scale(n = 1) {
+    this.x *= n;
+    this.y *= n;
+    this.z *= n;
+    return this;
+  }
+
   changeAxis() {
     this.x = [this.z, this.z = this.x][0];
     return this;
@@ -814,13 +821,9 @@ class CircuitFactory {
         line.bridges = [];
       }
       for(let z of line.bridges) {
-        const pos1 = new Vector3D(line.row * space, 
-                                  line.layer * margin * space, 
-                                  z * space).changeAxis();
-        const pos2 = new Vector3D(line.row * space, 
-                                  (line.layer * margin + graph_intarval) * space, 
-                                  z * space).changeAxis();
-        const e = new Edge(pos1, pos2, type);
+        const pos1 = new Vector3D(line.row, line.layer * margin, z).changeAxis();
+        const pos2 = new Vector3D(line.row, line.layer * margin + graph_intarval, z).changeAxis();
+        const e = new Edge(pos1.scale(space), pos2.scale(space), type);
         this.circuit.addEdge(e);
       }
 
@@ -829,13 +832,9 @@ class CircuitFactory {
         line.pins = [];
       }
       for(let z of line.pins) {
-        const pos1 = new Vector3D(line.row * space, 
-                                  line.layer * margin * space, 
-                                  z * space).changeAxis();
-        const pos2 = new Vector3D(line.row * space, 
-                                  (line.layer * margin + graph_intarval) * space, 
-                                  z * space).changeAxis();
-        const pin = new Pin(pos1, pos2, type);
+        const pos1 = new Vector3D(line.row, line.layer * margin, z).changeAxis();
+        const pos2 = new Vector3D(line.row, line.layer * margin + graph_intarval, z).changeAxis();
+        const pin = new Pin(pos1.scale(space), pos2.scale(space), type);
         this.circuit.addInjector(pin);
       }
 
@@ -844,13 +843,9 @@ class CircuitFactory {
         line.caps = [];
       }
       for(let z of line.caps) {
-        const pos1 = new Vector3D(line.row * space, 
-                                  line.layer * margin * space, 
-                                  z * space).changeAxis();
-        const pos2 = new Vector3D(line.row * space, 
-                                  (line.layer * margin + graph_intarval) * space, 
-                                  z * space).changeAxis();
-        const cap = new Cap(pos1, pos2, type);
+        const pos1 = new Vector3D(line.row, line.layer * margin, z).changeAxis();
+        const pos2 = new Vector3D(line.row, line.layer * margin + graph_intarval, z).changeAxis();
+        const cap = new Cap(pos1.scale(space), pos2.scale(space), type);
         this.circuit.addInjector(cap);
       }
     }
