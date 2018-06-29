@@ -110,8 +110,8 @@
   ],
   "braidings": [
     {
-        "control": 28,
-        "targets": [30],
+        "control": 30,
+        "targets": [28],
         "column": 3
     },
     {
