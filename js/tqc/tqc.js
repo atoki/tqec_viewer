@@ -883,8 +883,8 @@ class CircuitFactory {
     }
     for (let braiding of this.data.braidings) {
       const color = braiding.color ? braiding.color : 0;
-      // const b = new Braiding(braiding.control, braiding.targets, braiding.column, color);
-      const b = new BraidingWithBridge (braiding.control, braiding.targets, braiding.column, color);
+      const b = new Braiding(braiding.control, braiding.targets, braiding.column, color);
+      // const b = new BraidingWithBridge (braiding.control, braiding.targets, braiding.column, color);
       this.circuit.addBraiding(b);
     }
   }
