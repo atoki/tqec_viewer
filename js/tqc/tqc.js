@@ -9,7 +9,7 @@ var scale = 1;
 var margin = 4;         // >= 4
 var pitch = margin + 1;
 var space = pitch / 2;  // 論理量子ビットの間隔
-var graph_intarval = 2; // グラフ表現におけるprimal型, dual型の間隔
+var interval = 2; // グラフ表現におけるprimal型, dual型の間隔
 var showEdges = true;   // 境界線を見せるか否か
 var line_width = 2;     // 境界線の太さ
 
@@ -185,32 +185,31 @@ class SingleBitLine  {
     this.y = y;
     this.cbits = cbits;
     this.type = "primal";
-    this.line = [];
   }
-
-  createBits_() {
-    for(let z = this.range[0]; z <= this.range[1]; z += graph_intarval) {
+  
+  create() {
+    let index = 0;
+    let line = [];
+    let last_pos = this.correctPos_([this.x, this.y, this.range[0]], space);
+    let last_cube = new Cube(last_pos, this.type);
+    line.push(last_cube);
+    for(let z = this.range[0] + interval; z <= this.range[1]; z += interval) {
       const pos = this.correctPos_([this.x, this.y, z], space);
-      const qubit = new Cube(pos, this.type);
-      this.line.push(qubit);
-    }
-  }
+      const cube = new Cube(pos, this.type);
+      line.push(cube);
 
-  createEdges_() {
-    for(let z = this.range[0]; z <= this.range[1] - graph_intarval; z += graph_intarval) {
       let skip = false;
-      for (let cbit of this.cbits) {
-        if (this.x == cbit.control && z + 1 == cbit.column) {
-          skip = true;
-        }
+      if (this.cbits.length > index && z - 1 == this.cbits[index].column) {
+        skip = true;
+        index += 1;
       }
-      if (skip) continue;
-
-      const pos1 = this.correctPos_([this.x, this.y, z], space);
-      const pos2 = this.correctPos_([this.x, this.y, z + graph_intarval], space);
-      const edge = new Edge(pos1, pos2, this.type);
-      this.line.push(edge);
+      if (!skip) {
+        const edge = new Edge(last_pos, pos, this.type);
+        line.push(edge);
+      }
+      last_pos = pos;
     }
+    return line;
   }
 
   correctPos_(pos, space) {
@@ -218,14 +217,8 @@ class SingleBitLine  {
     corrected_pos.x = pos[0] * space;
     corrected_pos.y = pos[1] * space;
     corrected_pos.z = pos[2] * space;
-    corrected_pos.changeAxis(); // 軸変更
+    corrected_pos.changeAxis();
     return corrected_pos;
-  }
-
-  create() {
-      this.createBits_();
-      this.createEdges_();
-      return this.line;
   }
 }
 
@@ -233,18 +226,17 @@ class BitLine {
   constructor(row, range, layer, cbits) {
     this.row = row;
     this.range = range;
-    this.cbits = cbits;
     this.layer = layer
     this.lines = [];
-
-    const upper_line = new SingleBitLine(row, range, 
-                                         layer * margin, 
-                                         this.cbits);
-    const lower_line = new SingleBitLine(row, range, 
-                                         layer * margin + graph_intarval, 
-                                         this.cbits);
-    this.lines.push(upper_line.create());
-    this.lines.push(lower_line.create());
+    this.cbits = [];
+    for (let cbit of cbits) {
+      if (cbit.control == row) this.cbits.push(cbit);
+    }
+    this.cbits.sort(function (lhs, rhs) {
+      return lhs.column > rhs.column;
+    });
+    this.lines.push(new SingleBitLine(row, range, layer * margin, this.cbits).create());
+    this.lines.push(new SingleBitLine(row, range, layer * margin + interval, this.cbits).create());
   }
 
   apply(scene) {
@@ -381,9 +373,9 @@ class Braiding {
     
     let start = (this.cbitNo < this.tbitNoArray[0]) ? mintBitNo : maxtBitNo;
     const range = (this.cbitNo < this.tbitNoArray[0]) ? maxtBitNo : mintBitNo;
-    for (let z = start + graph_intarval * d; 
-         z != range + graph_intarval * d; 
-         z += graph_intarval * d){
+    for (let z = start + interval * d; 
+         z != range + interval * d; 
+         z += interval * d){
         // find tbit
         if (this.tbitNoArray.indexOf(z) != -1) {
           if (pos.y != this.height) {
@@ -412,7 +404,7 @@ class Braiding {
     this.push(pos)
 
     start = (this.cbitNo < this.tbitNoArray[0]) ? maxtBitNo : mintBitNo;
-    for (let z = start; z != this.cbitNo; z -= graph_intarval * d) {
+    for (let z = start; z != this.cbitNo; z -= interval * d) {
         pos.z -= pitch * d;
         this.push(pos)
     }
@@ -491,9 +483,9 @@ class BraidingWithBridge {
     
     let start = (this.cbitNo < this.tbitNoArray[0]) ? mintBitNo : maxtBitNo;
     const range = (this.cbitNo < this.tbitNoArray[0]) ? maxtBitNo : mintBitNo;
-    for (let z = start + graph_intarval * d; 
-         z != range + graph_intarval * d; 
-         z += graph_intarval * d){
+    for (let z = start + interval * d; 
+         z != range + interval * d; 
+         z += interval * d){
         // find tbit
         if (this.tbitNoArray.indexOf(z) != -1) {
           if (pos.y != this.height) {
@@ -520,7 +512,7 @@ class BraidingWithBridge {
     this.push(pos)
 
     start = (this.cbitNo < this.tbitNoArray[0]) ? maxtBitNo : mintBitNo;
-    for (let z = start; z != this.cbitNo; z -= graph_intarval * d) {
+    for (let z = start; z != this.cbitNo; z -= interval * d) {
         pos.z -= pitch * d;
         this.push(pos)
     }
@@ -822,7 +814,7 @@ class CircuitFactory {
       }
       for(let z of line.bridges) {
         const pos1 = new Vector3D(line.row, line.layer * margin, z).changeAxis();
-        const pos2 = new Vector3D(line.row, line.layer * margin + graph_intarval, z).changeAxis();
+        const pos2 = new Vector3D(line.row, line.layer * margin + interval, z).changeAxis();
         const e = new Edge(pos1.scale(space), pos2.scale(space), type);
         this.circuit.addEdge(e);
       }
@@ -833,7 +825,7 @@ class CircuitFactory {
       }
       for(let z of line.pins) {
         const pos1 = new Vector3D(line.row, line.layer * margin, z).changeAxis();
-        const pos2 = new Vector3D(line.row, line.layer * margin + graph_intarval, z).changeAxis();
+        const pos2 = new Vector3D(line.row, line.layer * margin + interval, z).changeAxis();
         const pin = new Pin(pos1.scale(space), pos2.scale(space), type);
         this.circuit.addInjector(pin);
       }
@@ -844,7 +836,7 @@ class CircuitFactory {
       }
       for(let z of line.caps) {
         const pos1 = new Vector3D(line.row, line.layer * margin, z).changeAxis();
-        const pos2 = new Vector3D(line.row, line.layer * margin + graph_intarval, z).changeAxis();
+        const pos2 = new Vector3D(line.row, line.layer * margin + interval, z).changeAxis();
         const cap = new Cap(pos1.scale(space), pos2.scale(space), type);
         this.circuit.addInjector(cap);
       }
