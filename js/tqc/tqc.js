@@ -1,14 +1,15 @@
 'use strict'
 
-var colors = {primal: 0xed1010, dual: 0x180cf7, module: 0xffefd5, 
-               pin: 0xffffe0, edge: 0x000000, aerial: 0x008b8b};
-// var colors = {primal: 0xffffff, dual: 0x333333, module: 0xffefd5, 
-//               pin: 0xff55ff, edge: 0x000000, aerial: 0x008b8b};
+// var colors = {primal: 0xed1010, dual: 0x180cf7, module: 0xffefd5, 
+//                pin: 0xffffe0, edge: 0x000000, aerial: 0x008b8b};
+var colors = {primal: 0xffffff, dual: 0x333333, module: 0x008b8b, 
+              pin: 0xff55ff, edge: 0x000000, aerial: 0x008b8b,
+              a_state_distillation: 0xffff00, y_state_distillation: 0x008000};
 var scale = 1;
 var margin = 4;         // >= 4
 var pitch = margin + 1;
 var space = pitch / 2;  // 論理量子ビットの間隔
-var graph_intarval = 2; // グラフ表現におけるprimal型, dual型の間隔
+var interval = 2; // グラフ表現におけるprimal型, dual型の間隔
 var showEdges = true;   // 境界線を見せるか否か
 var line_width = 2;     // 境界線の太さ
 
@@ -43,6 +44,13 @@ class Vector3D {
     if (base == 'y') vector3d.y -= n;
     if (base == 'z') vector3d.z -= n;
     return vector3d;
+  }
+
+  scale(n = 1) {
+    this.x *= n;
+    this.y *= n;
+    this.z *= n;
+    return this;
   }
 
   changeAxis() {
@@ -128,14 +136,14 @@ class Edge extends Rectangler {
 }
 
 class AerialCube extends Cube {
-  constructor(pos, type) {
-    super(pos, type, 0, true, 0.5);
+  constructor(pos) {
+    super(pos, "aerial", 0, 0.5, true);
   }
 }
 
 class AerialEdge extends Edge {
-  constructor(vertex_a, vertex_b, type) {
-    super(vertex_a, vertex_b, type, 0, true, 0.5);
+  constructor(vertex_a, vertex_b) {
+    super(vertex_a, vertex_b, "aerial", 0, 0.5, true);
   }
 }
 
@@ -177,32 +185,31 @@ class SingleBitLine  {
     this.y = y;
     this.cbits = cbits;
     this.type = "primal";
-    this.line = [];
   }
-
-  createBits_() {
-    for(let z = this.range[0]; z <= this.range[1]; z += graph_intarval) {
+  
+  create() {
+    let index = 0;
+    let line = [];
+    let last_pos = this.correctPos_([this.x, this.y, this.range[0]], space);
+    let last_cube = new Cube(last_pos, this.type);
+    line.push(last_cube);
+    for(let z = this.range[0] + interval; z <= this.range[1]; z += interval) {
       const pos = this.correctPos_([this.x, this.y, z], space);
-      const qubit = new Cube(pos, this.type);
-      this.line.push(qubit);
-    }
-  }
+      const cube = new Cube(pos, this.type);
+      line.push(cube);
 
-  createEdges_() {
-    for(let z = this.range[0]; z <= this.range[1] - graph_intarval; z += graph_intarval) {
       let skip = false;
-      for (let cbit of this.cbits) {
-        if (this.x == cbit.control && z + 1 == cbit.column) {
-          skip = true;
-        }
+      if (this.cbits.length > index && z - 1 == this.cbits[index].column) {
+        skip = true;
+        index += 1;
       }
-      if (skip) continue;
-
-      const pos1 = this.correctPos_([this.x, this.y, z], space);
-      const pos2 = this.correctPos_([this.x, this.y, z + graph_intarval], space);
-      const edge = new Edge(pos1, pos2, this.type);
-      this.line.push(edge);
+      if (!skip) {
+        const edge = new Edge(last_pos, pos, this.type);
+        line.push(edge);
+      }
+      last_pos = pos;
     }
+    return line;
   }
 
   correctPos_(pos, space) {
@@ -210,14 +217,8 @@ class SingleBitLine  {
     corrected_pos.x = pos[0] * space;
     corrected_pos.y = pos[1] * space;
     corrected_pos.z = pos[2] * space;
-    corrected_pos.changeAxis(); // 軸変更
+    corrected_pos.changeAxis();
     return corrected_pos;
-  }
-
-  create() {
-      this.createBits_();
-      this.createEdges_();
-      return this.line;
   }
 }
 
@@ -225,18 +226,17 @@ class BitLine {
   constructor(row, range, layer, cbits) {
     this.row = row;
     this.range = range;
-    this.cbits = cbits;
     this.layer = layer
     this.lines = [];
-
-    const upper_line = new SingleBitLine(row, range, 
-                                         layer * margin, 
-                                         this.cbits);
-    const lower_line = new SingleBitLine(row, range, 
-                                         layer * margin + graph_intarval, 
-                                         this.cbits);
-    this.lines.push(upper_line.create());
-    this.lines.push(lower_line.create());
+    this.cbits = [];
+    for (let cbit of cbits) {
+      if (cbit.control == row) this.cbits.push(cbit);
+    }
+    this.cbits.sort(function (lhs, rhs) {
+      return lhs.column > rhs.column;
+    });
+    this.lines.push(new SingleBitLine(row, range, layer * margin, this.cbits).create());
+    this.lines.push(new SingleBitLine(row, range, layer * margin + interval, this.cbits).create());
   }
 
   apply(scene) {
@@ -322,7 +322,7 @@ class Pin extends Injector {
 
 class Cap extends Injector {
   constructor(vertex_a, vertex_b, type) {
-    super(vertex_a, vertex_b, type, colors[type], 0.1, true);
+    super(vertex_a, vertex_b, type, colors[type], 0.5, true);
   }
 }
 
@@ -373,9 +373,9 @@ class Braiding {
     
     let start = (this.cbitNo < this.tbitNoArray[0]) ? mintBitNo : maxtBitNo;
     const range = (this.cbitNo < this.tbitNoArray[0]) ? maxtBitNo : mintBitNo;
-    for (let z = start + graph_intarval * d; 
-         z != range + graph_intarval * d; 
-         z += graph_intarval * d){
+    for (let z = start + interval * d; 
+         z != range + interval * d; 
+         z += interval * d){
         // find tbit
         if (this.tbitNoArray.indexOf(z) != -1) {
           if (pos.y != this.height) {
@@ -404,7 +404,7 @@ class Braiding {
     this.push(pos)
 
     start = (this.cbitNo < this.tbitNoArray[0]) ? maxtBitNo : mintBitNo;
-    for (let z = start; z != this.cbitNo; z -= graph_intarval * d) {
+    for (let z = start; z != this.cbitNo; z -= interval * d) {
         pos.z -= pitch * d;
         this.push(pos)
     }
@@ -483,9 +483,9 @@ class BraidingWithBridge {
     
     let start = (this.cbitNo < this.tbitNoArray[0]) ? mintBitNo : maxtBitNo;
     const range = (this.cbitNo < this.tbitNoArray[0]) ? maxtBitNo : mintBitNo;
-    for (let z = start + graph_intarval * d; 
-         z != range + graph_intarval * d; 
-         z += graph_intarval * d){
+    for (let z = start + interval * d; 
+         z != range + interval * d; 
+         z += interval * d){
         // find tbit
         if (this.tbitNoArray.indexOf(z) != -1) {
           if (pos.y != this.height) {
@@ -512,7 +512,7 @@ class BraidingWithBridge {
     this.push(pos)
 
     start = (this.cbitNo < this.tbitNoArray[0]) ? maxtBitNo : mintBitNo;
-    for (let z = start; z != this.cbitNo; z -= graph_intarval * d) {
+    for (let z = start; z != this.cbitNo; z -= interval * d) {
         pos.z -= pitch * d;
         this.push(pos)
     }
@@ -547,33 +547,35 @@ class BraidingWithBridge {
   }
 }
 
-class Module {
-  constructor(pos, size, ghost) {
-    this.pos = pos;
-    this.size = size;
-    this.ghost = ghost;
-    this.color = colors.aerial;
+class Hadamard extends Rectangler {
+  constructor(pos, ...visual) {
+    const size = Hadamard.getSize_();
+    super(pos, size, "dual", ...visual);
   }
 
-  apply(scene) {
-    const cube = this.createMesh_();
-    let edge = new THREE.BoxHelper(cube, colors.edge);
-    edge.material.linewidth = line_width;
+  static getSize_() {
+    let size = new Size(space * 4, space * 3.5, space * 2);
+    size.changeAxis();
+    return size;
+  }
+}
 
-    scene.add(cube);
-    scene.add(edge)
+class Module extends Rectangler {
+  constructor(pos, size, rotation, type, ...visual) {
+    const [pos_, size_] = Module.correctPos_(pos, size, rotation);
+    super(pos_, size_, type, ...visual);
   }
 
-  createMesh_() {
-    const w = this.size.w * scale;
-    const h = this.size.h * scale;
-    const d = this.size.d * scale;
-    const cubeGeometry = new THREE.BoxGeometry(w, h, d);
-    const cubeMaterial = new THREE.MeshPhongMaterial({color: this.color, opacity: 0.3, transparent: this.ghost});
-    let cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-    cube.position.set(this.pos.x, this.pos.y, this.pos.z);
-
-    return cube;
+  static correctPos_(pos, size, rotation) {
+    let size_ = {"x": size.x, "y": size.y, "z": size.z};
+    let size_array = [size_[rotation[0]], size_[rotation[1]], size_[rotation[2]]];
+    size.set(size_array[0] + scale, size_array[1] + scale, size_array[2] + scale);
+    let index = 0;
+    for (let base of ["x", "y", "z"]) {
+      pos = pos.add(size_array[index] / 2.0, base);
+      index += 1;
+    }
+    return [pos, size];
   }
 }
 
@@ -587,6 +589,7 @@ class Circuit {
     this.bit_lines = [];
     this.injectors = [];
     this.braidings = [];
+    this.hadamards = [];
     this.modules = [];
   }
 
@@ -598,7 +601,7 @@ class Circuit {
     this.edges.push(edge);
   }
 
-  addAerialCube(aerial_qubit) {
+  addAerialCube(aerial_cube) {
     this.aerial_cubes.push(aerial_cube);
   }
 
@@ -618,12 +621,18 @@ class Circuit {
     this.braidings.push(braiding);
   }
 
+  addHadamard(hadamard) {
+    this.hadamards.push(hadamard);
+  }
+
   addModule(module) {
     this.modules.push(module);
   }
 
   apply(scene) {
-    for(let elements of [this.cubes, this.edges, this.aerial_cubes, this.aerial_edges, this.injectors, this.bit_lines, this.braidings, this.modules]) {
+    for(let elements of [this.cubes, this.edges, this.aerial_cubes, 
+                         this.aerial_edges, this.injectors, this.bit_lines, 
+                         this.braidings, this.hadamards, this.modules]) {
       for(let element of elements) {
         element.apply(scene);
       }
@@ -644,6 +653,7 @@ class CircuitFactory {
     this.createBitLines_();
     this.createInjectors_();
     this.createBraidings_();
+    this.createHadamards_();
     this.createAerialCubes_();
     this.createAerialEdges_();
     this.createModules_();
@@ -669,7 +679,13 @@ class CircuitFactory {
     let visual = [];
     for (let block of blocks) {
       if (Array.isArray(block)) vertices.push(block);
-      if ("visual" in block) visual = this.parseVisual_(block.visual);
+      else if ("visual" in block) visual = this.parseVisual_(block.visual);
+      else {
+        const pos1 = this.correctPos_(block.vertices[0], space);
+        const pos2 = this.correctPos_(block.vertices[1], space);
+        const aerial = new AerialEdge(pos1, pos2)
+        this.circuit.addAerialEdge(aerial);
+      }
     }
     for (let vertex_list of vertices) {
       let first = false;
@@ -693,9 +709,16 @@ class CircuitFactory {
 
   createInjectorsInLogicalQubit_(type, injectors = []) {
     for (let injector of injectors) {
-      const pos1 = this.correctPos_(injector.vertices[0], space);
-      const pos2 = this.correctPos_(injector.vertices[1], space);
-      const visual = injector.visual ? this.parseVisual_(injector.visual) : [];
+      let pos1, pos2, visual = [];
+      if (Array.isArray(injector)) {
+        pos1 = this.correctPos_(injector[0], space);
+        pos2 = this.correctPos_(injector[1], space);
+      }
+      else {
+        pos1 = this.correctPos_(injector.vertices[0], space);
+        pos2 = this.correctPos_(injector.vertices[1], space);
+        visual = injector.visual ? this.parseVisual_(injector.visual) : [];
+      }
       const pin = new Pin(pos1, pos2, type, ...visual);
       this.circuit.addInjector(pin);
     }
@@ -703,9 +726,16 @@ class CircuitFactory {
 
   createCapsInLogicalQubit_(type, caps = []) {
     for (let injector of caps) {
-      const pos1 = this.correctPos_(injector.vertices[0], space);
-      const pos2 = this.correctPos_(injector.vertices[1], space);
-      const visual = injector.visual ? this.parseVisual_(injector.visual) : [];
+      let pos1, pos2, visual = [];
+      if (Array.isArray(injector)) {
+        pos1 = this.correctPos_(injector[0], space);
+        pos2 = this.correctPos_(injector[1], space);
+      }
+      else {
+        pos1 = this.correctPos_(injector.vertices[0], space);
+        pos2 = this.correctPos_(injector.vertices[1], space);
+        visual = injector.visual ? this.parseVisual_(injector.visual) : [];
+      }
       const cap = new Cap(pos1, pos2, type, ...visual);
       this.circuit.addInjector(cap);
     }
@@ -742,10 +772,9 @@ class CircuitFactory {
     if(!this.data.aerial_cubes) {
       return;
     }
-    const type = "aerial"
     for(let cube of this.data.aerial_cubes) {
       const pos = this.correctPos_(cube, space);
-      const c = new AerialCube(pos, type);
+      const c = new AerialCube(pos);
       this.circuit.addAerialCube(c);
     }
   }
@@ -754,11 +783,10 @@ class CircuitFactory {
     if(!this.data.aerial_edges) {
       return;
     }
-    const type = "aerial"
     for(let edge of this.data.aerial_edges) {
       const pos1 = this.correctPos_(edge.pos1, space);
       const pos2 = this.correctPos_(edge.pos2, space);
-      const e = new AerialEdge(pos1, pos2, type);
+      const e = new AerialEdge(pos1, pos2);
       this.circuit.addAerialEdge(e);
     }
   }
@@ -785,13 +813,9 @@ class CircuitFactory {
         line.bridges = [];
       }
       for(let z of line.bridges) {
-        const pos1 = new Vector3D(line.row * space, 
-                                  line.layer * margin * space, 
-                                  z * space).changeAxis();
-        const pos2 = new Vector3D(line.row * space, 
-                                  (line.layer * margin + graph_intarval) * space, 
-                                  z * space).changeAxis();
-        const e = new Edge(pos1, pos2, type);
+        const pos1 = new Vector3D(line.row, line.layer * margin, z).changeAxis();
+        const pos2 = new Vector3D(line.row, line.layer * margin + interval, z).changeAxis();
+        const e = new Edge(pos1.scale(space), pos2.scale(space), type);
         this.circuit.addEdge(e);
       }
 
@@ -800,13 +824,9 @@ class CircuitFactory {
         line.pins = [];
       }
       for(let z of line.pins) {
-        const pos1 = new Vector3D(line.row * space, 
-                                  line.layer * margin * space, 
-                                  z * space).changeAxis();
-        const pos2 = new Vector3D(line.row * space, 
-                                  (line.layer * margin + graph_intarval) * space, 
-                                  z * space).changeAxis();
-        const pin = new Pin(pos1, pos2, type);
+        const pos1 = new Vector3D(line.row, line.layer * margin, z).changeAxis();
+        const pos2 = new Vector3D(line.row, line.layer * margin + interval, z).changeAxis();
+        const pin = new Pin(pos1.scale(space), pos2.scale(space), type);
         this.circuit.addInjector(pin);
       }
 
@@ -815,13 +835,9 @@ class CircuitFactory {
         line.caps = [];
       }
       for(let z of line.caps) {
-        const pos1 = new Vector3D(line.row * space, 
-                                  line.layer * margin * space, 
-                                  z * space).changeAxis();
-        const pos2 = new Vector3D(line.row * space, 
-                                  (line.layer * margin + graph_intarval) * space, 
-                                  z * space).changeAxis();
-        const cap = new Cap(pos1, pos2, type);
+        const pos1 = new Vector3D(line.row, line.layer * margin, z).changeAxis();
+        const pos2 = new Vector3D(line.row, line.layer * margin + interval, z).changeAxis();
+        const cap = new Cap(pos1.scale(space), pos2.scale(space), type);
         this.circuit.addInjector(cap);
       }
     }
@@ -854,9 +870,21 @@ class CircuitFactory {
     }
     for (let braiding of this.data.braidings) {
       const color = braiding.color ? braiding.color : 0;
-      // const b = new Braiding(braiding.control, braiding.targets, braiding.column, color);
-      const b = new BraidingWithBridge (braiding.control, braiding.targets, braiding.column, color);
+      const b = new Braiding(braiding.control, braiding.targets, braiding.column, color);
+      // const b = new BraidingWithBridge (braiding.control, braiding.targets, braiding.column, color);
       this.circuit.addBraiding(b);
+    }
+  }
+
+  createHadamards_() {
+    if (!this.data.hadamards) {
+      return;
+    }
+    for (let hadamard of this.data.hadamards) {
+      const pos = this.correctPos_(hadamard.pos, space);
+      const visual = this.parseVisual_(hadamard.visual);
+      const h = new Hadamard(pos, ...visual);
+      this.circuit.addHadamard(h);
     }
   }
 
@@ -865,17 +893,14 @@ class CircuitFactory {
       return;
     }
     for (let module of this.data.modules) {
-      const size = new Size(module.size[0] * space, module.size[1] * space, module.size[2] * space);
-      const x = module.pos[0] * space + (size.w / 2); 
-      const y = module.pos[1] * space + (size.h / 2);
-      const z = module.pos[2] * space + (size.d / 2);
-      const pos = new Vector3D(x, y, z);
+      const id = module.id;
+      const size = this.correctPos_(module.size, space);
+      const pos = this.correctPos_(module.pos, space);
+      const rotation = module.rotation ? module.rotation : ["x", "y", "z"];
+      const visual = module.visual ? this.parseVisual_(module.visual) : [];
+      const description = module.description;
 
-      size.w += 1;
-      size.h += 1;
-      size.d += 1;
-
-      const m = new Module(pos, size, module.ghost);
+      const m = new Module(pos, size, rotation, id, ...visual);
       this.circuit.addModule(m);
     }
   }
@@ -890,10 +915,15 @@ class CircuitFactory {
   }
 
   parseVisual_(data) {
+    if (!data) {
+      return [0, 1.0, false];
+    }
     let visual = [];
-    if ("color" in data) visual.push(data["color"]);
-    if ("opacity" in data) visual.push(data["opacity"]);
-    if ("ghost" in data) visual.push(data["ghost"]);
+    let default_ = {color: 0, opacity: 1.0, ghost: false};
+    for (let property of ["color", "opacity", "ghost"]) {
+      if (property in data) visual.push(data[property]);
+      else visual.push(default_[property]);
+    }
     return visual;
   }
 }
