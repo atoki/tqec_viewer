@@ -688,8 +688,8 @@ class CircuitFactory {
       }
     }
     for (let vertex_list of vertices) {
-      let first = false;
-      let last_pos = vertex_list[0];
+      let first = true;
+      let last_pos = this.correctPos_(vertex_list[0], space);
       let last_cube = new Cube(last_pos, type, ...visual);
       this.circuit.addCube(last_cube);
       for (let vertex of vertex_list) {
